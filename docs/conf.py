@@ -6,9 +6,9 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 project = 'AtlasUI'
-copyright = '2024, MongoDB Atlas UI Team'
-author = 'MongoDB Atlas UI Team'
-release = '0.1.0'
+copyright = '2024, Independent Developer'
+author = 'Independent Developer'
+release = '0.1.3'
 
 # -- General configuration ---------------------------------------------------
 extensions = [

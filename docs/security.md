@@ -1,59 +1,53 @@
-Security Guidelines
-===================
+# Security Guidelines
 
 This document outlines security best practices for using AtlasUI.
 
-Authentication Methods
-----------------------
+## Authentication Methods
 
 AtlasUI supports two authentication methods:
 
-API Keys (Legacy)
-^^^^^^^^^^^^^^^^^
+### API Keys (Recommended for AtlasUI)
 
-* **Use Case**: Development and testing
-* **Security Level**: Moderate
-* **Pros**: Simple to set up
-* **Cons**: Long-lived credentials, harder to audit
+* **Use Case**: Organization-level access for full AtlasUI functionality
+* **Security Level**: Moderate to High (with proper management)
+* **Pros**: Simple to set up, organization-wide access
+* **Cons**: Long-lived credentials, requires careful management
 
-Service Accounts (Recommended)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+### Service Accounts (Limited Utility)
 
-* **Use Case**: Production deployments
+* **Use Case**: Project-scoped operations only
 * **Security Level**: High
 * **Pros**: JWT-based, better audit trail, fine-grained permissions
-* **Cons**: Slightly more complex setup
+* **Cons**: Project-scoped only, not suitable for organization-wide management
 
-See :doc:`service_accounts` for detailed information.
+**Note**: AtlasUI requires organization-level access to manage all resources. Service accounts are project-scoped and have limited utility for this application.
 
-Credential Management
----------------------
+See [service_accounts.md](service_accounts.md) for detailed information.
 
-Never Commit Credentials
-^^^^^^^^^^^^^^^^^^^^^^^^^
+## Credential Management
+
+### Never Commit Credentials
 
 Add these to your `.gitignore`:
 
-.. code-block:: text
+```text
+.env
+.env.local
+.env.*.local
+service-account.json
+*-credentials.json
+```
 
-    .env
-    .env.local
-    .env.*.local
-    service-account.json
-    *-credentials.json
-
-File Permissions
-^^^^^^^^^^^^^^^^
+### File Permissions
 
 Set restrictive permissions on credential files:
 
-.. code-block:: bash
+```bash
+chmod 600 .env
+chmod 600 service-account.json
+```
 
-    chmod 600 .env
-    chmod 600 service-account.json
-
-Environment Variables
-^^^^^^^^^^^^^^^^^^^^^
+### Environment Variables
 
 Use environment-specific `.env` files:
 
@@ -61,8 +55,7 @@ Use environment-specific `.env` files:
 * `.env.staging` - Staging credentials
 * `.env.production` - Production credentials (never commit!)
 
-Secrets Management
-^^^^^^^^^^^^^^^^^^
+### Secrets Management
 
 For production deployments, use a secrets manager:
 
@@ -73,51 +66,45 @@ For production deployments, use a secrets manager:
 
 Example with AWS Secrets Manager:
 
-.. code-block:: python
+```python
+import boto3
+import json
+from atlasui.client import AtlasClient
 
-    import boto3
-    import json
-    from atlasui.client import AtlasClient
+# Retrieve credentials from AWS Secrets Manager
+client = boto3.client('secretsmanager')
+secret = client.get_secret_value(SecretId='atlasui/atlas-api-keys')
+credentials = json.loads(secret['SecretString'])
 
-    # Retrieve credentials from AWS Secrets Manager
-    client = boto3.client('secretsmanager')
-    secret = client.get_secret_value(SecretId='atlasui/service-account')
-    credentials = json.loads(secret['SecretString'])
+# Use credentials
+atlas_client = AtlasClient(
+    auth_method="api_key",
+    public_key=credentials['public_key'],
+    private_key=credentials['private_key']
+)
+```
 
-    # Use credentials
-    atlas_client = AtlasClient(
-        auth_method="service_account",
-        service_account_id=credentials['client_id'],
-        service_account_secret=credentials['private_key']
-    )
+## Network Security
 
-Network Security
-----------------
-
-HTTPS Only
-^^^^^^^^^^
+### HTTPS Only
 
 Always use HTTPS for Atlas API communications (default):
 
-.. code-block:: bash
+```bash
+ATLAS_BASE_URL=https://cloud.mongodb.com
+```
 
-    ATLAS_BASE_URL=https://cloud.mongodb.com
-
-IP Whitelisting
-^^^^^^^^^^^^^^^
+### IP Whitelisting
 
 Configure IP access lists in Atlas to restrict access to your application servers.
 
-Private Endpoints
-^^^^^^^^^^^^^^^^^
+### Private Endpoints
 
 For enhanced security, use AWS PrivateLink, Azure Private Link, or GCP Private Service Connect.
 
-Application Security
---------------------
+## Application Security
 
-Web Server
-^^^^^^^^^^
+### Web Server
 
 When deploying the web server:
 
@@ -129,24 +116,23 @@ When deploying the web server:
 
 Example nginx configuration:
 
-.. code-block:: nginx
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name atlasui.example.com;
 
-    server {
-        listen 443 ssl http2;
-        server_name atlasui.example.com;
+    ssl_certificate /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
 
-        ssl_certificate /path/to/cert.pem;
-        ssl_certificate_key /path/to/key.pem;
-
-        location / {
-            proxy_pass http://localhost:8000;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-        }
+    location / {
+        proxy_pass http://localhost:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
+}
+```
 
-API Security
-^^^^^^^^^^^^
+### API Security
 
 For the REST API:
 
@@ -156,22 +142,9 @@ For the REST API:
 4. **Output Sanitization**: Sanitize output to prevent XSS
 5. **Audit Logging**: Log all API access for security auditing
 
-Credential Rotation
--------------------
+## Credential Rotation
 
-Service Account Rotation
-^^^^^^^^^^^^^^^^^^^^^^^^
-
-Rotate service account credentials regularly (e.g., every 90 days):
-
-1. Create new service account
-2. Update configuration with new credentials
-3. Test new credentials
-4. Deploy updated configuration
-5. Delete old service account
-
-API Key Rotation
-^^^^^^^^^^^^^^^^
+### API Key Rotation
 
 To rotate API keys:
 
@@ -180,8 +153,7 @@ To rotate API keys:
 3. Restart application
 4. Delete old API key in Atlas
 
-Zero-Downtime Rotation
-^^^^^^^^^^^^^^^^^^^^^^^
+### Zero-Downtime Rotation
 
 For zero-downtime rotation:
 
@@ -191,11 +163,9 @@ For zero-downtime rotation:
 4. Switch to new credentials only
 5. Remove old credentials
 
-Monitoring & Auditing
----------------------
+## Monitoring & Auditing
 
-Access Logs
-^^^^^^^^^^^
+### Access Logs
 
 Monitor Atlas access logs for:
 
@@ -203,8 +173,7 @@ Monitor Atlas access logs for:
 * Failed authentication attempts
 * Unexpected API calls
 
-Application Logs
-^^^^^^^^^^^^^^^^
+### Application Logs
 
 Log security-relevant events:
 
@@ -213,8 +182,7 @@ Log security-relevant events:
 * Credential rotations
 * Configuration changes
 
-Alerts
-^^^^^^
+### Alerts
 
 Set up alerts for:
 
@@ -223,52 +191,45 @@ Set up alerts for:
 * High-privilege operations
 * Unusual API usage patterns
 
-Compliance
-----------
+## Compliance
 
-Data Protection
-^^^^^^^^^^^^^^^
+### Data Protection
 
 * **GDPR**: Handle user data in compliance with GDPR
 * **HIPAA**: For healthcare data, ensure HIPAA compliance
 * **SOC 2**: Follow SOC 2 requirements for service providers
 
-Encryption
-^^^^^^^^^^
+### Encryption
 
 * **In Transit**: All API communications use TLS 1.2+
 * **At Rest**: Atlas encrypts data at rest by default
 
-Vulnerability Management
-------------------------
+## Vulnerability Management
 
-Keep Dependencies Updated
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+### Keep Dependencies Updated
 
 Regularly update dependencies to get security patches:
 
-.. code-block:: bash
+```bash
+pip install --upgrade atlasui
+pip list --outdated
+```
 
-    inv dev-install
-    pip list --outdated
-
-Security Scanning
-^^^^^^^^^^^^^^^^^
+### Security Scanning
 
 Use security scanning tools:
 
-.. code-block:: bash
+```bash
+# Scan for vulnerabilities
+pip install safety
+safety check
 
-    # Scan for vulnerabilities
-    pip install safety
-    safety check
+# Scan code for security issues
+pip install bandit
+bandit -r atlasui/
+```
 
-    # Scan code for security issues
-    pip install bandit
-    bandit -r atlasui/
-
-Incident Response
------------------
+## Incident Response
 
 If you suspect a security breach:
 
@@ -278,12 +239,11 @@ If you suspect a security breach:
 4. **Document**: Document the incident and response
 5. **Update**: Update security measures to prevent recurrence
 
-Reporting Security Issues
---------------------------
+## Reporting Security Issues
 
 To report security vulnerabilities in AtlasUI:
 
 * **Do not** open a public GitHub issue
-* Email security concerns to the project maintainers
+* Report issues via GitHub's security advisory feature
 * Provide detailed information about the vulnerability
 * Allow time for a fix before public disclosure

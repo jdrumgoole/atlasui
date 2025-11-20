@@ -7,10 +7,14 @@ from unittest.mock import Mock, patch, MagicMock
 from atlasui.client import AtlasClient
 
 
+@patch('atlasui.client.base.ServiceAccountAuth')
 @patch('atlasui.client.base.httpx.Client')
-@patch('atlasui.client.service_account.ServiceAccountAuth')
-def test_atlas_client_with_service_account(mock_auth, mock_http_client):
+def test_atlas_client_with_service_account(mock_http_client, mock_auth):
     """Test creating AtlasClient with service account authentication."""
+    # Create a mock auth instance that will be returned
+    mock_auth_instance = MagicMock()
+    mock_auth.return_value = mock_auth_instance
+
     client = AtlasClient(
         auth_method="service_account",
         service_account_id="test-client-id",
@@ -18,7 +22,6 @@ def test_atlas_client_with_service_account(mock_auth, mock_http_client):
     )
 
     assert client.auth_method == "service_account"
-    assert mock_auth.called
 
     # Verify auth was created with correct parameters
     mock_auth.assert_called_once_with(
@@ -27,9 +30,9 @@ def test_atlas_client_with_service_account(mock_auth, mock_http_client):
     )
 
 
+@patch('atlasui.client.base.ServiceAccountManager')
 @patch('atlasui.client.base.httpx.Client')
-@patch('atlasui.client.service_account.ServiceAccountManager')
-def test_atlas_client_with_credentials_file(mock_manager, mock_http_client):
+def test_atlas_client_with_credentials_file(mock_http_client, mock_manager):
     """Test creating AtlasClient with credentials file."""
     mock_manager_instance = MagicMock()
     mock_auth_instance = MagicMock()
@@ -42,7 +45,6 @@ def test_atlas_client_with_credentials_file(mock_manager, mock_http_client):
     )
 
     assert client.auth_method == "service_account"
-    assert mock_manager.called
     mock_manager.assert_called_once_with("test-credentials.json")
     mock_manager_instance.get_auth.assert_called_once()
 
@@ -71,9 +73,14 @@ def test_atlas_client_defaults_to_api_key(mock_digest_auth, mock_http_client):
     assert mock_digest_auth.called
 
 
+@patch('atlasui.client.base.settings')
 @patch('atlasui.client.base.httpx.Client')
-def test_atlas_client_api_key_missing_credentials(mock_http_client):
+def test_atlas_client_api_key_missing_credentials(mock_http_client, mock_settings):
     """Test AtlasClient raises error when API key credentials are missing."""
+    # Mock settings to have no credentials
+    mock_settings.atlas_public_key = None
+    mock_settings.atlas_private_key = None
+
     with pytest.raises(ValueError, match="API key authentication requires"):
         AtlasClient(
             auth_method="api_key"

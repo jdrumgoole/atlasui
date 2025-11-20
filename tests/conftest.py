@@ -3,13 +3,81 @@ Pytest configuration and fixtures.
 """
 
 import pytest
+import sys
 from unittest.mock import Mock, patch
 from atlasui.client import AtlasClient
+from atlasui.config import settings
+
+
+def pytest_configure(config):
+    """Register custom markers."""
+    config.addinivalue_line(
+        "markers", "integration: mark test as integration test (requires valid API credentials)"
+    )
+
+
+@pytest.fixture(scope="session")
+def validate_credentials():
+    """
+    Validate that Atlas API credentials are configured and working.
+
+    This fixture runs once per test session and validates that:
+    1. API credentials are configured in environment
+    2. The credentials are valid and can authenticate to Atlas API
+
+    If validation fails, integration tests will be skipped.
+
+    Returns:
+        bool: True if credentials are valid, False otherwise
+    """
+    try:
+        # Check if credentials are configured
+        if settings.atlas_auth_method == "api_key":
+            if not settings.atlas_public_key or not settings.atlas_private_key:
+                print("\n⚠️  Atlas API keys not configured. Skipping integration tests.", file=sys.stderr)
+                print("   Set ATLAS_PUBLIC_KEY and ATLAS_PRIVATE_KEY environment variables.", file=sys.stderr)
+                return False
+        elif settings.atlas_auth_method == "service_account":
+            if not settings.atlas_service_account_credentials_file:
+                if not settings.atlas_service_account_id or not settings.atlas_service_account_secret:
+                    print("\n⚠️  Atlas service account credentials not configured. Skipping integration tests.", file=sys.stderr)
+                    return False
+
+        # Validate credentials work by making a test API call
+        with AtlasClient() as client:
+            try:
+                # Try to get API root - this validates authentication
+                client.get_root()
+                print("\n✓ Atlas API credentials validated successfully", file=sys.stderr)
+                return True
+            except Exception as e:
+                print(f"\n⚠️  Atlas API credentials validation failed: {e}", file=sys.stderr)
+                print("   Please check your API keys or service account credentials.", file=sys.stderr)
+                return False
+
+    except Exception as e:
+        print(f"\n⚠️  Failed to validate Atlas credentials: {e}", file=sys.stderr)
+        return False
+
+
+@pytest.fixture
+def atlas_client(validate_credentials):
+    """
+    Create a real Atlas API client for integration tests.
+
+    Requires valid credentials to be configured.
+    Skips test if credentials are not valid.
+    """
+    if not validate_credentials:
+        pytest.skip("Atlas API credentials not configured or invalid")
+
+    with AtlasClient() as client:
+        yield client
 
 
 @pytest.fixture
 def mock_atlas_client():
-    """Create a mock Atlas client for testing."""
+    """Create a mock Atlas client for unit testing."""
     with patch('atlasui.client.base.httpx.Client') as mock_client:
         yield mock_client
 

@@ -1,31 +1,26 @@
-AtlasUI Documentation
-=====================
+# AtlasUI Documentation
 
 Welcome to AtlasUI's documentation. AtlasUI is a comprehensive user interface for MongoDB Atlas,
 providing both a web-based interface and CLI tool for managing MongoDB Atlas resources.
 
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+```{toctree}
+:maxdepth: 2
+:caption: Contents
 
-   installation
-   quickstart
-   service_accounts
-   security
-   api/index
-   cli/index
-   development
+installation
+quickstart
+service_accounts
+security
+```
 
-Features
---------
+## Features
 
 * **Web UI**: FastAPI-based web interface for MongoDB Atlas management
 * **CLI Tool**: Command-line interface for Atlas operations
 * **Complete API Coverage**: Built from official MongoDB Atlas OpenAPI specifications
 * **Modern Stack**: FastAPI, Typer, Rich, and modern Python tooling
 
-Atlas API Coverage
-------------------
+## Atlas API Coverage
 
 This UI provides access to all MongoDB Atlas administration APIs including:
 
@@ -38,9 +33,8 @@ This UI provides access to all MongoDB Atlas administration APIs including:
 * **Federation**: Configure identity providers and SSO
 * **Network Access**: Manage IP access lists and private endpoints
 
-Indices and tables
-==================
+## Indices and tables
 
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
+* {ref}`genindex`
+* {ref}`modindex`
+* {ref}`search`

@@ -26,27 +26,89 @@ This UI provides access to all MongoDB Atlas administration APIs including:
 ## Installation
 
 ```bash
-# Using uv (recommended)
-uv pip install -e .
+# Install from PyPI
+pip install atlasui
+
+# Or install from source
+pip install -e .
 
 # With development dependencies
-uv pip install -e ".[dev]"
+pip install -e ".[dev]"
 
 # With documentation dependencies
-uv pip install -e ".[docs]"
-
-# Or use invoke for setup
-inv setup
+pip install -e ".[docs]"
 ```
 
 ## Configuration
 
-### Option 1: API Key Authentication (Recommended)
+AtlasUI provides an interactive configuration tool that guides you through the setup process.
 
-**For AtlasUI, API keys are the recommended authentication method** because they provide organization-level access, which is required for this application to work correctly across all organizations, projects, and clusters.
+### Quick Setup (Recommended)
+
+Run the interactive configuration wizard:
+
+```bash
+atlasui-configure
+```
+
+This wizard will:
+- Help you choose between API Keys (recommended) and Service Accounts
+- Explain the limitations and benefits of each method
+- Guide you through entering your credentials
+- Create and configure your `.env` file automatically
+- Test your connection to verify everything works
+
+### Authentication Methods
+
+#### API Keys (Recommended) ⭐
+
+**Best for:** Full AtlasUI functionality
+
+API keys provide **organization-level** access, allowing AtlasUI to:
+- Manage all organizations in your Atlas account
+- Access all projects across organizations
+- Control all clusters across all projects
+
+**Quick start:**
+```bash
+atlasui-configure
+# Choose option 1 (API Keys)
+# Follow the wizard instructions
+```
+
+**How to get API keys:**
+1. Go to https://cloud.mongodb.com
+2. Organization → Access Manager → API Keys
+3. Create API Key with Organization Owner permissions
+4. Copy Public Key and Private Key
+
+#### Service Accounts (Limited) ⚠️
+
+**Best for:** Single project operations only
+
+**⚠️ Important Limitation**: Service accounts are **project-scoped** - each can only access ONE project.
+
+Since AtlasUI needs organization-level access, service accounts have **limited utility**.
+
+**Only use service accounts if:**
+- You only need to manage a single specific project
+- You prefer OAuth 2.0 authentication
+- You understand you won't have full AtlasUI functionality
 
 **Setup:**
+```bash
+atlasui-configure
+# Choose option 2 (Service Account)
+# Follow the wizard (will warn about limitations)
+```
 
+See [Service Account Documentation](docs/service_accounts.md) for details.
+
+### Manual Configuration
+
+If you prefer to configure manually:
+
+**For API Keys:**
 ```bash
 cp .env.example .env
 # Edit .env and set:
@@ -57,31 +119,6 @@ ATLAS_PRIVATE_KEY=your_private_key
 
 **⚠ Important**: Never commit credentials to version control!
 
-### Option 2: Service Account Authentication (Limited Support)
-
-**⚠️ Important Limitation**: Service accounts in MongoDB Atlas are scoped to individual projects, not organizations. Since AtlasUI is designed to manage **all organizations, projects, and clusters** in your Atlas account, service accounts have limited utility for this application.
-
-**When to use service accounts:**
-- You only need to manage resources within a single project
-- You want OAuth 2.0 authentication for project-specific operations
-
-**Setup (for project-scoped operations only):**
-
-```bash
-# Interactive setup wizard
-inv configure-service-account
-
-# Manual setup
-cp .env.example .env
-# Edit .env and set:
-ATLAS_AUTH_METHOD=service_account
-ATLAS_SERVICE_ACCOUNT_CREDENTIALS_FILE=/path/to/service-account.json
-```
-
-See the [Service Account Documentation](docs/service_accounts.md) for detailed instructions.
-
-**Recommendation**: For full AtlasUI functionality across all organizations and projects, use API key authentication (Option 1).
-
 ## Usage
 
 ### Web UI
@@ -89,17 +126,20 @@ See the [Service Account Documentation](docs/service_accounts.md) for detailed i
 Start the web server:
 
 ```bash
-# Using invoke
-inv run
-
-# Or directly
 atlasui-server
-
-# Or with uv
-uv run python -m atlasui.server
 ```
 
 Then open your browser to http://localhost:8000
+
+The server can also be started with custom options:
+
+```bash
+# Custom host and port
+uvicorn atlasui.server:app --host 0.0.0.0 --port 8080
+
+# With auto-reload for development
+uvicorn atlasui.server:app --reload
+```
 
 ### CLI Tool
 
@@ -122,26 +162,35 @@ atlasui --help
 
 ## Development
 
-AtlasUI uses [Invoke](https://www.pyinvoke.org/) for task automation.
+For developers working on AtlasUI, the project uses [Invoke](https://www.pyinvoke.org/) for task automation.
 
-### Available Tasks
+### Setup
 
 ```bash
-# See all available tasks
-inv --list
+# Install with development dependencies
+pip install -e ".[dev]"
 
-# Setup development environment
+# Or use invoke
 inv setup
+```
 
-# Install with dev dependencies
-inv dev-install
+### Running Tests
 
-# Run tests
+```bash
+# Run all tests
 inv test
 
 # Run tests without coverage
 inv test --no-coverage
 
+# Or use pytest directly
+pytest
+pytest --cov=atlasui --cov-report=html
+```
+
+### Code Quality
+
+```bash
 # Format code
 inv format
 
@@ -154,56 +203,41 @@ inv lint
 # Run all checks (format, lint, test)
 inv check
 
-# Build documentation
+# Or use tools directly
+black atlasui tests
+ruff check atlasui tests
+mypy atlasui
+```
+
+### Building Documentation
+
+```bash
+# Build docs with invoke
 inv docs
 
-# Build and open docs in browser
+# Build and open in browser
 inv docs --open-browser
+
+# Or build directly with Sphinx
+cd docs
+sphinx-build -b html . _build/html
+```
+
+### Other Development Tasks
+
+```bash
+# Run development server
+inv run
+
+# Run with custom host/port
+inv run --host=0.0.0.0 --port=8080
 
 # Clean build artifacts
 inv clean
 
-# Run web server
-inv run
-
-# Run with custom host/port
-inv run --host=127.0.0.1 --port=8080
-
-# Run with auto-reload
-inv run --reload
-
-# Show CLI help
-inv cli
-
 # Show version
 inv version
-
-# Test Atlas connection
-inv info
 ```
-
-### Common Development Workflows
-
-```bash
-# Initial setup
-inv setup
-
-# Before committing
-inv check
-
-# Making a release
-inv release
-```
-
-## Documentation
-
-Build the documentation:
-
-```bash
-inv docs
-```
-
-View the documentation at `docs/_build/html/index.html`
 
 ## Project Structure
 
@@ -222,22 +256,6 @@ atlasui/
 ├── docs/             # Sphinx documentation
 ├── openapi/          # MongoDB Atlas OpenAPI specs
 └── tasks.py          # Invoke task definitions
-```
-
-## Testing
-
-```bash
-# Run all tests
-inv test
-
-# Run specific test file
-pytest tests/test_client.py
-
-# Run with verbose output
-inv test --verbose
-
-# Generate coverage report
-inv test --coverage
 ```
 
 ## API Access
@@ -266,3 +284,9 @@ Contributions are welcome! Please see CONTRIBUTING.md for details.
 - [Contributing Guide](CONTRIBUTING.md) - Development guidelines
 - [MongoDB Atlas API Docs](https://www.mongodb.com/docs/atlas/reference/api-resources-spec/)
 - [MongoDB Atlas OpenAPI Specs](https://github.com/mongodb/openapi)
+
+---
+
+## Built with Claude
+
+This project was built with assistance from [Claude](https://claude.ai), Anthropic's AI assistant.
