@@ -2,3 +2,6 @@
 - when stopping and starting the server use the atlasgui script to start and stop the server
 - use inv start and inv stop to start and stop the server processes
 - we do not render links fields in the REST API for Atlas as these are used for pagination of data
+- keep the pyproject.toml version and the config.py version in sync
+- use atlasui start and atlasui stop to start and stop the service
+- Keep the two cluster pages in sync as much as possible

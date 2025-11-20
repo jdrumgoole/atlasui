@@ -219,6 +219,18 @@ class AtlasClient:
         """
         return self.get(f"/groups/{project_id}")
 
+    def delete_project(self, project_id: str) -> Dict[str, Any]:
+        """
+        Delete a project.
+
+        Args:
+            project_id: Project ID
+
+        Returns:
+            Deletion response
+        """
+        return self.delete(f"/groups/{project_id}")
+
     def list_clusters(
         self, project_id: str, page_num: int = 1, items_per_page: int = 100
     ) -> Dict[str, Any]:

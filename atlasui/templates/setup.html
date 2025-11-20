@@ -1,0 +1,527 @@
+{% extends "base.html" %}
+
+{% block title %}Setup Wizard - AtlasUI{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Progress Steps -->
+            <div class="mb-4">
+                <ul class="nav nav-pills nav-justified" id="setupSteps">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="step1-tab">
+                            <i class="bi bi-info-circle"></i> Welcome
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="step2-tab">
+                            <i class="bi bi-key"></i> Auth Method
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="step3-tab">
+                            <i class="bi bi-shield-lock"></i> Credentials
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="step4-tab">
+                            <i class="bi bi-check-circle"></i> Complete
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Step 1: Welcome -->
+            <div class="card setup-step" id="step1" style="display: block;">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-rocket"></i> Welcome to AtlasUI</h4>
+                </div>
+                <div class="card-body">
+                    <h5 class="mb-3">Let's get you set up!</h5>
+                    <p>This wizard will guide you through configuring AtlasUI to connect to your MongoDB Atlas account.</p>
+
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill"></i> <strong>What you'll need:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>A MongoDB Atlas account (<a href="https://cloud.mongodb.com" target="_blank">cloud.mongodb.com</a>)</li>
+                            <li>API credentials (we'll show you how to get them)</li>
+                            <li>About 5 minutes</li>
+                        </ul>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <button class="btn btn-primary btn-lg" onclick="goToStep(2)">
+                            Get Started <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2: Choose Auth Method -->
+            <div class="card setup-step" id="step2" style="display: none;">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-key"></i> Choose Authentication Method</h4>
+                </div>
+                <div class="card-body">
+                    <p class="lead">How would you like to authenticate with MongoDB Atlas?</p>
+
+                    <!-- API Key Option (Recommended) -->
+                    <div class="card mb-3 border-success" id="apiKeyOption" style="cursor: pointer;"
+                         onclick="selectAuthMethod('api_key')">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h5 class="card-title">
+                                        <input type="radio" name="authMethod" value="api_key" checked>
+                                        API Keys
+                                        <span class="badge bg-success ms-2">Recommended</span>
+                                    </h5>
+                                    <p class="card-text">
+                                        <strong>Organization-level access</strong><br>
+                                        Full access to all organizations, projects, and clusters in your Atlas account.
+                                    </p>
+                                    <ul class="small text-muted mb-0">
+                                        <li>Simplest setup</li>
+                                        <li>Full AtlasUI functionality</li>
+                                        <li>Manage all resources</li>
+                                    </ul>
+                                </div>
+                                <i class="bi bi-check-circle-fill text-success fs-2" id="apiKeyCheck"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Service Account Option -->
+                    <div class="card border-warning" id="serviceAccountOption" style="cursor: pointer;"
+                         onclick="selectAuthMethod('service_account')">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h5 class="card-title">
+                                        <input type="radio" name="authMethod" value="service_account">
+                                        Service Account
+                                        <span class="badge bg-warning text-dark ms-2">Limited</span>
+                                    </h5>
+                                    <p class="card-text">
+                                        <strong>Project-level access</strong><br>
+                                        Access limited to a single project only.
+                                    </p>
+                                    <ul class="small text-muted mb-0">
+                                        <li>More complex setup</li>
+                                        <li>Limited to one project</li>
+                                        <li>OAuth 2.0 based</li>
+                                    </ul>
+                                </div>
+                                <i class="bi bi-circle text-muted fs-2" id="serviceAccountCheck" style="display: none;"></i>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between mt-4">
+                        <button class="btn btn-secondary" onclick="goToStep(1)">
+                            <i class="bi bi-arrow-left"></i> Back
+                        </button>
+                        <button class="btn btn-primary" onclick="confirmAuthMethod()">
+                            Continue <i class="bi bi-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3: Enter Credentials (API Key) -->
+            <div class="card setup-step" id="step3-api-key" style="display: none;">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0"><i class="bi bi-shield-lock"></i> Enter API Keys</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Instructions -->
+                    <div class="alert alert-info">
+                        <h6><i class="bi bi-info-circle-fill"></i> How to get your API Keys:</h6>
+                        <ol class="small mb-0">
+                            <li>Go to <a href="https://cloud.mongodb.com" target="_blank" class="alert-link">cloud.mongodb.com</a></li>
+                            <li>Click your organization name → <strong>Access Manager</strong></li>
+                            <li>Click <strong>API Keys</strong> tab</li>
+                            <li>Click <strong>Create API Key</strong></li>
+                            <li>Set permissions: <strong>Organization Owner</strong></li>
+                            <li>Copy the <strong>Public Key</strong> and <strong>Private Key</strong></li>
+                            <li>Add your IP address to the API Key whitelist</li>
+                        </ol>
+                    </div>
+
+                    <form id="apiKeyForm" onsubmit="submitAPIKey(event)">
+                        <div class="mb-3">
+                            <label for="publicKey" class="form-label">Public Key</label>
+                            <input type="text" class="form-control" id="publicKey"
+                                   placeholder="Enter your Atlas API Public Key" required>
+                            <div class="form-text">The public key from your Atlas API Key</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="privateKey" class="form-label">Private Key</label>
+                            <input type="password" class="form-control" id="privateKey"
+                                   placeholder="Enter your Atlas API Private Key" required>
+                            <div class="form-text">The private key (shown only once when created)</div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="showPrivateKey"
+                                       onchange="togglePrivateKeyVisibility()">
+                                <label class="form-check-label" for="showPrivateKey">
+                                    Show private key
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="apiKeyError" class="alert alert-danger" style="display: none;"></div>
+                        <div id="apiKeySuccess" class="alert alert-success" style="display: none;"></div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-secondary" onclick="goToStep(2)">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </button>
+                            <button type="submit" class="btn btn-primary" id="apiKeySubmitBtn">
+                                <span class="spinner-border spinner-border-sm" style="display: none;" id="apiKeySpinner"></span>
+                                Test & Save <i class="bi bi-check"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Step 3: Enter Credentials (Service Account) -->
+            <div class="card setup-step" id="step3-service-account" style="display: none;">
+                <div class="card-header bg-warning text-dark">
+                    <h4 class="mb-0"><i class="bi bi-shield-lock"></i> Enter Service Account Credentials</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle-fill"></i> <strong>Remember:</strong> Service accounts are project-scoped. You'll have limited functionality.
+                    </div>
+
+                    <!-- Instructions -->
+                    <div class="alert alert-info">
+                        <h6><i class="bi bi-info-circle-fill"></i> How to get service account credentials:</h6>
+                        <ol class="small mb-0">
+                            <li>Go to <a href="https://cloud.mongodb.com" target="_blank" class="alert-link">cloud.mongodb.com</a></li>
+                            <li>Select your organization</li>
+                            <li>Click <strong>Access Manager</strong> → <strong>Service Accounts</strong></li>
+                            <li>Click <strong>Create Service Account</strong></li>
+                            <li>Assign roles for ONE PROJECT</li>
+                            <li>Copy the <strong>Client ID</strong> and <strong>Client Secret</strong></li>
+                        </ol>
+                    </div>
+
+                    <form id="serviceAccountForm" onsubmit="submitServiceAccount(event)">
+                        <div class="mb-3">
+                            <label for="clientId" class="form-label">Client ID</label>
+                            <input type="text" class="form-control" id="clientId"
+                                   placeholder="Enter Client ID" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="clientSecret" class="form-label">Client Secret</label>
+                            <input type="password" class="form-control" id="clientSecret"
+                                   placeholder="Enter Client Secret" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="projectId" class="form-label">Project ID</label>
+                            <input type="text" class="form-control" id="projectId"
+                                   placeholder="Enter Project ID" required>
+                            <div class="form-text">The Atlas project ID this service account has access to</div>
+                        </div>
+
+                        <div id="serviceAccountError" class="alert alert-danger" style="display: none;"></div>
+                        <div id="serviceAccountSuccess" class="alert alert-success" style="display: none;"></div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-secondary" onclick="goToStep(2)">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </button>
+                            <button type="submit" class="btn btn-warning" id="serviceAccountSubmitBtn">
+                                <span class="spinner-border spinner-border-sm" style="display: none;" id="serviceAccountSpinner"></span>
+                                Test & Save <i class="bi bi-check"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Step 4: Complete -->
+            <div class="card setup-step" id="step4" style="display: none;">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0"><i class="bi bi-check-circle"></i> Setup Complete!</h4>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i>
+                    </div>
+
+                    <h4 class="mb-3">Your AtlasUI is configured!</h4>
+                    <p class="lead" id="setupCompleteMessage">You're all set to start managing your MongoDB Atlas resources.</p>
+
+                    <div id="organizationsList" class="mt-4" style="display: none;">
+                        <h6>Your Organizations:</h6>
+                        <div class="list-group" id="orgsListGroup"></div>
+                    </div>
+
+                    <div class="d-grid gap-2 mt-4">
+                        <a href="/organizations" class="btn btn-success btn-lg">
+                            <i class="bi bi-diagram-3"></i> Go to Organizations
+                        </a>
+                        <a href="/projects" class="btn btn-outline-primary">
+                            <i class="bi bi-folder"></i> View Projects
+                        </a>
+                        <a href="/clusters" class="btn btn-outline-primary">
+                            <i class="bi bi-hdd-rack"></i> View Clusters
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+.setup-step {
+    min-height: 400px;
+}
+
+.nav-pills .nav-link {
+    color: #6c757d;
+    pointer-events: none;
+}
+
+.nav-pills .nav-link.active {
+    background-color: #0d6efd;
+}
+
+.nav-pills .nav-link.completed {
+    background-color: #198754;
+    color: white;
+}
+
+.card:hover {
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+</style>
+
+<script>
+let selectedAuthMethod = 'api_key';
+let currentStep = 1;
+
+function goToStep(step) {
+    // Hide all steps
+    document.querySelectorAll('.setup-step').forEach(el => el.style.display = 'none');
+
+    // Update step tabs
+    document.querySelectorAll('#setupSteps .nav-link').forEach((el, idx) => {
+        el.classList.remove('active');
+        if (idx + 1 < step) {
+            el.classList.add('completed');
+        } else {
+            el.classList.remove('completed');
+        }
+    });
+
+    // Show target step
+    if (step === 1) {
+        document.getElementById('step1').style.display = 'block';
+        document.getElementById('step1-tab').classList.add('active');
+    } else if (step === 2) {
+        document.getElementById('step2').style.display = 'block';
+        document.getElementById('step2-tab').classList.add('active');
+    } else if (step === 3) {
+        if (selectedAuthMethod === 'api_key') {
+            document.getElementById('step3-api-key').style.display = 'block';
+        } else {
+            document.getElementById('step3-service-account').style.display = 'block';
+        }
+        document.getElementById('step3-tab').classList.add('active');
+    } else if (step === 4) {
+        document.getElementById('step4').style.display = 'block';
+        document.getElementById('step4-tab').classList.add('active');
+    }
+
+    currentStep = step;
+    window.scrollTo(0, 0);
+}
+
+function selectAuthMethod(method) {
+    selectedAuthMethod = method;
+
+    // Update UI
+    const apiKeyOption = document.getElementById('apiKeyOption');
+    const serviceAccountOption = document.getElementById('serviceAccountOption');
+    const apiKeyCheck = document.getElementById('apiKeyCheck');
+    const serviceAccountCheck = document.getElementById('serviceAccountCheck');
+
+    if (method === 'api_key') {
+        apiKeyOption.classList.add('border-success');
+        serviceAccountOption.classList.remove('border-warning');
+        apiKeyCheck.style.display = 'block';
+        serviceAccountCheck.style.display = 'none';
+        document.querySelector('input[value="api_key"]').checked = true;
+    } else {
+        apiKeyOption.classList.remove('border-success');
+        serviceAccountOption.classList.add('border-warning');
+        apiKeyCheck.style.display = 'none';
+        serviceAccountCheck.style.display = 'block';
+        document.querySelector('input[value="service_account"]').checked = true;
+    }
+}
+
+function confirmAuthMethod() {
+    goToStep(3);
+}
+
+function togglePrivateKeyVisibility() {
+    const privateKeyInput = document.getElementById('privateKey');
+    const checkbox = document.getElementById('showPrivateKey');
+    privateKeyInput.type = checkbox.checked ? 'text' : 'password';
+}
+
+async function submitAPIKey(event) {
+    event.preventDefault();
+
+    const publicKey = document.getElementById('publicKey').value.trim();
+    const privateKey = document.getElementById('privateKey').value.trim();
+    const errorDiv = document.getElementById('apiKeyError');
+    const successDiv = document.getElementById('apiKeySuccess');
+    const submitBtn = document.getElementById('apiKeySubmitBtn');
+    const spinner = document.getElementById('apiKeySpinner');
+
+    // Clear previous messages
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+
+    // Show spinner
+    spinner.style.display = 'inline-block';
+    submitBtn.disabled = true;
+
+    try {
+        const response = await fetch('/api/setup/configure/api-key', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({public_key: publicKey, private_key: privateKey})
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            successDiv.textContent = data.message;
+            successDiv.style.display = 'block';
+
+            // Test connection
+            await testConnection();
+        } else {
+            errorDiv.textContent = data.detail || 'Configuration failed';
+            errorDiv.style.display = 'block';
+        }
+    } catch (err) {
+        errorDiv.textContent = 'Failed to configure: ' + err.message;
+        errorDiv.style.display = 'block';
+    } finally {
+        spinner.style.display = 'none';
+        submitBtn.disabled = false;
+    }
+}
+
+async function submitServiceAccount(event) {
+    event.preventDefault();
+
+    const clientId = document.getElementById('clientId').value.trim();
+    const clientSecret = document.getElementById('clientSecret').value.trim();
+    const projectId = document.getElementById('projectId').value.trim();
+    const errorDiv = document.getElementById('serviceAccountError');
+    const successDiv = document.getElementById('serviceAccountSuccess');
+    const submitBtn = document.getElementById('serviceAccountSubmitBtn');
+    const spinner = document.getElementById('serviceAccountSpinner');
+
+    errorDiv.style.display = 'none';
+    successDiv.style.display = 'none';
+    spinner.style.display = 'inline-block';
+    submitBtn.disabled = true;
+
+    try {
+        const response = await fetch('/api/setup/configure/service-account', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                client_id: clientId,
+                client_secret: clientSecret,
+                project_id: projectId
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            successDiv.textContent = data.message;
+            if (data.warning) {
+                successDiv.textContent += ' Note: ' + data.warning;
+            }
+            successDiv.style.display = 'block';
+
+            // Test connection
+            await testConnection();
+        } else {
+            errorDiv.textContent = data.detail || 'Configuration failed';
+            errorDiv.style.display = 'block';
+        }
+    } catch (err) {
+        errorDiv.textContent = 'Failed to configure: ' + err.message;
+        errorDiv.style.display = 'block';
+    } finally {
+        spinner.style.display = 'none';
+        submitBtn.disabled = false;
+    }
+}
+
+async function testConnection() {
+    try {
+        const response = await fetch('/api/setup/test-connection?auth_method=' + selectedAuthMethod, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            // Show organizations if available
+            if (data.organizations && data.organizations.length > 0) {
+                const orgsList = document.getElementById('organizationsList');
+                const orgsListGroup = document.getElementById('orgsListGroup');
+
+                orgsListGroup.innerHTML = '';
+                data.organizations.forEach(org => {
+                    const item = document.createElement('div');
+                    item.className = 'list-group-item';
+                    item.innerHTML = `<strong>${org.name}</strong><br><small class="text-muted">${org.id}</small>`;
+                    orgsListGroup.appendChild(item);
+                });
+
+                orgsList.style.display = 'block';
+                document.getElementById('setupCompleteMessage').textContent =
+                    `Found ${data.organizations_count} organization(s). You're ready to go!`;
+            }
+
+            // Go to completion step
+            setTimeout(() => goToStep(4), 1000);
+        } else {
+            console.warn('Connection test returned with warnings:', data);
+            // Still go to step 4 but with warning
+            setTimeout(() => goToStep(4), 1000);
+        }
+    } catch (err) {
+        console.error('Connection test failed:', err);
+        // Still go to step 4 - configuration is saved
+        setTimeout(() => goToStep(4), 1000);
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    goToStep(1);
+});
+</script>
+{% endblock %}

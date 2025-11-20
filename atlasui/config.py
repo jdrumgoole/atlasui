@@ -4,6 +4,20 @@ Configuration management for AtlasUI using Pydantic Settings.
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+from pathlib import Path
+import tomllib
+
+
+def _get_version() -> str:
+    """Read version from pyproject.toml."""
+    try:
+        pyproject_path = Path(__file__).parent.parent / "pyproject.toml"
+        with open(pyproject_path, "rb") as f:
+            pyproject = tomllib.load(f)
+            return pyproject.get("project", {}).get("version", "0.0.0")
+    except Exception:
+        # Fallback version if reading fails
+        return "0.0.0"
 
 
 class Settings(BaseSettings):
@@ -32,7 +46,7 @@ class Settings(BaseSettings):
 
     # Application Configuration
     app_name: str = "AtlasUI"
-    app_version: str = "0.1.0"
+    app_version: str = _get_version()
     debug: bool = False
 
     # Web Server Configuration

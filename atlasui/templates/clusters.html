@@ -190,6 +190,31 @@
         </div>
     </div>
 </div>
+
+<!-- Logout Confirmation Modal -->
+<div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="logoutModalLabel">
+                    <i class="bi bi-box-arrow-right"></i> Confirm Logout
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>You will be logged out from cluster:</p>
+                <p class="text-center"><strong id="logoutClusterName"></strong></p>
+                <p class="text-muted small">Your session will be closed and you will need to login again to access this cluster's databases.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmLogoutBtn">
+                    <i class="bi bi-box-arrow-right"></i> Logout
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -334,8 +359,10 @@ function renderClusters() {
             <td>${cluster.providerSettings?.instanceSizeName || 'N/A'}</td>
             <td><span class="badge bg-secondary">${users.length}</span></td>
             <td>
-                <button class="btn btn-sm btn-outline-success" onclick="showAddUserModal('${cluster.projectId}', '${cluster.projectName}')" title="Add User">
-                    <i class="bi bi-person-plus"></i> Add User
+                <button class="btn btn-sm btn-outline-primary cluster-login-btn"
+                        data-cluster="${cluster.name}"
+                        onclick="handleClusterAction('${cluster.name}')">
+                    <i class="bi bi-box-arrow-in-right"></i> Login
                 </button>
             </td>
         `;
@@ -756,10 +783,89 @@ async function addDatabaseUser() {
     }
 }
 
+// Handle cluster login/logout button action
+let currentLogoutCluster = null;
+
+function handleClusterAction(clusterName) {
+    const button = document.querySelector(`button[data-cluster="${clusterName}"]`);
+    const isLoggedIn = button.classList.contains('btn-outline-danger');
+
+    if (isLoggedIn) {
+        // Show logout confirmation
+        showLogoutConfirmation(clusterName);
+    } else {
+        // Navigate to databases page for login
+        window.location.href = `/clusters/${encodeURIComponent(clusterName)}/databases`;
+    }
+}
+
+function showLogoutConfirmation(clusterName) {
+    currentLogoutCluster = clusterName;
+    document.getElementById('logoutClusterName').textContent = clusterName;
+
+    const logoutModal = new bootstrap.Modal(document.getElementById('logoutModal'));
+    logoutModal.show();
+}
+
+async function performLogout() {
+    if (!currentLogoutCluster) return;
+
+    const button = document.querySelector(`button[data-cluster="${currentLogoutCluster}"]`);
+
+    try {
+        // Call logout API
+        const response = await fetch('/api/clusters/session/logout', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            // Update button to login state
+            button.classList.remove('btn-outline-danger');
+            button.classList.add('btn-outline-primary');
+            button.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Login';
+
+            // Close modal
+            bootstrap.Modal.getInstance(document.getElementById('logoutModal')).hide();
+
+            // Show success message
+            console.log(`Logged out from ${currentLogoutCluster}`);
+        } else {
+            console.error('Logout failed');
+        }
+    } catch (err) {
+        console.error('Logout error:', err);
+    }
+
+    currentLogoutCluster = null;
+}
+
+async function checkSessionStatus() {
+    try {
+        const response = await fetch('/api/clusters/session/status');
+        const data = await response.json();
+
+        if (data.active && data.cluster_name) {
+            // Update the button for the logged-in cluster
+            const button = document.querySelector(`button[data-cluster="${data.cluster_name}"]`);
+            if (button) {
+                button.classList.remove('btn-outline-primary');
+                button.classList.add('btn-outline-danger');
+                button.innerHTML = '<i class="bi bi-box-arrow-right"></i> Logout';
+            }
+        }
+    } catch (err) {
+        console.log('No active session or error checking session');
+    }
+}
+
 // Add event listeners
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('loginBtn').addEventListener('click', loginToCluster);
     document.getElementById('addUserBtn').addEventListener('click', addDatabaseUser);
+    document.getElementById('confirmLogoutBtn').addEventListener('click', performLogout);
+
+    // Check session status on page load
+    checkSessionStatus();
 
     // Allow Enter key to submit login
     document.getElementById('loginForm').addEventListener('submit', function(e) {

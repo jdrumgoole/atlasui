@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from atlasui.client import AtlasClient
+from atlasui.config import settings
 
 router = APIRouter()
 
@@ -14,11 +15,49 @@ router = APIRouter()
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+# Add global variables to templates
+templates.env.globals["app_version"] = settings.app_version
+templates.env.globals["app_author"] = "joe@joedrumgoole.com"
+
+
+def is_configured() -> bool:
+    """Check if AtlasUI is configured with credentials."""
+    env_path = Path(".env")
+
+    if not env_path.exists():
+        return False
+
+    try:
+        with env_path.open('r') as f:
+            content = f.read()
+
+        # Check for API Key configuration
+        has_api_key = "ATLAS_PUBLIC_KEY" in content and "ATLAS_PRIVATE_KEY" in content
+
+        # Check for Service Account configuration
+        has_service_account = "ATLAS_SERVICE_ACCOUNT_CLIENT_ID" in content
+
+        return has_api_key or has_service_account
+    except Exception:
+        return False
+
 
 @router.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    """Redirect home to organizations page."""
+    """Redirect home to setup or organizations based on configuration status."""
+    if not is_configured():
+        return RedirectResponse(url="/setup", status_code=302)
     return RedirectResponse(url="/organizations", status_code=302)
+
+
+@router.get("/setup", response_class=HTMLResponse)
+async def setup_wizard(request: Request):
+    """Render the setup wizard page."""
+    # If already configured, redirect to organizations
+    if is_configured():
+        return RedirectResponse(url="/organizations", status_code=302)
+
+    return templates.TemplateResponse("setup.html", {"request": request})
 
 
 @router.get("/organizations", response_class=HTMLResponse)

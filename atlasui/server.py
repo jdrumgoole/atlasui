@@ -2,20 +2,71 @@
 FastAPI server for AtlasUI web interface.
 """
 
+import asyncio
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 from atlasui.config import settings
-from atlasui.api import projects, clusters, alerts, backups, users, pages, organizations, databases
+from atlasui.api import projects, clusters, alerts, backups, users, pages, organizations, databases, server, setup
+from atlasui.session_manager import get_session_manager
 
-# Create FastAPI app
+
+# Background task for cleaning up expired sessions
+async def cleanup_sessions_task():
+    """Background task that periodically cleans up expired MongoDB sessions."""
+    session_manager = get_session_manager()
+    while True:
+        try:
+            await asyncio.sleep(300)  # Run every 5 minutes
+            expired_count = session_manager.cleanup_expired_sessions()
+            if expired_count > 0:
+                print(f"Cleaned up {expired_count} expired MongoDB session(s)")
+        except Exception as e:
+            print(f"Error in session cleanup task: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan context manager for FastAPI app.
+    Handles startup and shutdown events.
+    """
+    # Startup
+    print("Starting AtlasUI server...")
+    print("Initializing MongoDB session manager...")
+
+    # Start background cleanup task
+    cleanup_task = asyncio.create_task(cleanup_sessions_task())
+
+    yield
+
+    # Shutdown
+    print("Shutting down AtlasUI server...")
+
+    # Cancel cleanup task
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+    # Close all MongoDB sessions
+    session_manager = get_session_manager()
+    session_count = len(session_manager)
+    session_manager.close_all_sessions()
+    print(f"Closed {session_count} MongoDB session(s)")
+
+
+# Create FastAPI app with lifespan
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="MongoDB Atlas Administration UI",
+    lifespan=lifespan,
 )
 
 # Get paths
@@ -33,7 +84,12 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # Setup templates
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
+# Add global variables to templates
+templates.env.globals["app_version"] = settings.app_version
+templates.env.globals["app_author"] = "joe@joedrumgoole.com"
+
 # Include API routers
+app.include_router(setup.router, prefix="/api/setup", tags=["Setup"])
 app.include_router(organizations.router, prefix="/api/organizations", tags=["Organizations"])
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
 app.include_router(clusters.router, prefix="/api/clusters", tags=["Clusters"])
@@ -41,6 +97,7 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(databases.router, prefix="/api/databases", tags=["Databases"])
+app.include_router(server.router, prefix="/api/server", tags=["Server"])
 
 # Include page routers
 app.include_router(pages.router, tags=["Pages"])

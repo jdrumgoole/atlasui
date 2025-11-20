@@ -60,6 +60,51 @@
         </div>
     </div>
 </div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteConfirmModalLabel">
+                    <i class="bi bi-exclamation-triangle"></i> Confirm Project Deletion
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger mb-3">
+                    <strong>Warning!</strong> This action cannot be undone. Deleting this project will permanently remove:
+                </div>
+
+                <h6>Project: <strong id="deleteProjectName"></strong></h6>
+
+                <div id="deleteResourcesLoading" class="text-center my-3">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="small mt-2">Loading project resources...</p>
+                </div>
+
+                <div id="deleteResourcesList" class="d-none">
+                    <h6 class="mt-3">Clusters to be deleted:</h6>
+                    <div id="deleteClustersContainer"></div>
+
+                    <div class="mt-3 p-3 bg-light border rounded">
+                        <p class="mb-2"><strong>To confirm deletion, type the project name exactly as shown above:</strong></p>
+                        <input type="text" class="form-control" id="deleteConfirmInput" placeholder="Type project name here">
+                        <div id="deleteConfirmError" class="text-danger small mt-1 d-none">Project name does not match</div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="deleteConfirmBtn" disabled onclick="executeDeleteProject()">
+                    <i class="bi bi-trash"></i> Delete Project
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -182,8 +227,8 @@ function renderProjects() {
             </td>
             <td>${new Date(project.created).toLocaleDateString()}</td>
             <td>
-                <button class="btn btn-sm btn-outline-info" onclick="showProjectDetails('${project.id}')">
-                    <i class="bi bi-info-circle"></i> Details
+                <button class="btn btn-sm btn-outline-danger" onclick="confirmDeleteProject('${project.id}', '${project.name.replace(/'/g, "\\'")}')">
+                    <i class="bi bi-trash"></i> Delete
                 </button>
             </td>
         `;
@@ -358,6 +403,171 @@ function getStatusBadgeClass(status) {
             return 'bg-info';
         default:
             return 'bg-secondary';
+    }
+}
+
+// Delete project functionality
+let deleteProjectId = null;
+let deleteProjectNameExpected = null;
+
+async function confirmDeleteProject(projectId, projectName) {
+    deleteProjectId = projectId;
+    deleteProjectNameExpected = projectName;
+
+    // Reset modal state
+    document.getElementById('deleteProjectName').textContent = projectName;
+    document.getElementById('deleteConfirmInput').value = '';
+    document.getElementById('deleteConfirmBtn').disabled = true;
+    document.getElementById('deleteConfirmError').classList.add('d-none');
+    document.getElementById('deleteResourcesLoading').classList.remove('d-none');
+    document.getElementById('deleteResourcesList').classList.add('d-none');
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+    modal.show();
+
+    // Load clusters and databases
+    try {
+        const clustersResponse = await fetch(`/api/clusters/${projectId}`);
+        const clustersData = await clustersResponse.ok ? await clustersResponse.json() : { results: [] };
+        const clusters = clustersData.results || [];
+
+        // Build clusters list with database info
+        const clustersContainer = document.getElementById('deleteClustersContainer');
+
+        if (clusters.length === 0) {
+            clustersContainer.innerHTML = '<p class="text-muted">No clusters in this project</p>';
+        } else {
+            let html = '<ul class="list-group">';
+            for (const cluster of clusters) {
+                html += `
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong><i class="bi bi-hdd-rack"></i> ${cluster.name}</strong>
+                                <div class="small text-muted">
+                                    ${cluster.clusterType || 'N/A'} •
+                                    ${cluster.mongoDBVersion || 'N/A'} •
+                                    ${cluster.providerSettings?.providerName || 'N/A'}
+                                </div>
+                                <div class="small text-muted mt-1">
+                                    <strong>Note:</strong> All databases and collections in this cluster will be permanently deleted
+                                </div>
+                            </div>
+                            <span class="badge ${getStatusBadgeClass(cluster.stateName)}">${cluster.stateName || 'UNKNOWN'}</span>
+                        </div>
+                    </li>
+                `;
+            }
+            html += '</ul>';
+            clustersContainer.innerHTML = html;
+        }
+
+        // Hide loading, show resources
+        document.getElementById('deleteResourcesLoading').classList.add('d-none');
+        document.getElementById('deleteResourcesList').classList.remove('d-none');
+
+    } catch (err) {
+        console.error('Error loading project resources:', err);
+        document.getElementById('deleteResourcesLoading').innerHTML = `
+            <div class="alert alert-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                Failed to load project resources. You can still proceed with deletion.
+            </div>
+        `;
+        document.getElementById('deleteResourcesList').classList.remove('d-none');
+    }
+}
+
+// Validate project name input
+document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('deleteConfirmInput');
+    const btn = document.getElementById('deleteConfirmBtn');
+    const error = document.getElementById('deleteConfirmError');
+
+    input.addEventListener('input', function() {
+        const value = input.value.trim();
+        if (value === deleteProjectNameExpected) {
+            btn.disabled = false;
+            error.classList.add('d-none');
+        } else {
+            btn.disabled = true;
+            if (value.length > 0) {
+                error.classList.remove('d-none');
+            } else {
+                error.classList.add('d-none');
+            }
+        }
+    });
+});
+
+async function executeDeleteProject() {
+    if (!deleteProjectId) return;
+
+    const btn = document.getElementById('deleteConfirmBtn');
+    const originalHtml = btn.innerHTML;
+
+    // Show loading state
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
+
+    try {
+        const response = await fetch(`/api/projects/${deleteProjectId}`, {
+            method: 'DELETE'
+        });
+
+        let errorMessage = 'Failed to delete project';
+
+        if (!response.ok) {
+            try {
+                const error = await response.json();
+                errorMessage = error.detail || errorMessage;
+            } catch (parseError) {
+                // If response is not JSON, use status text
+                errorMessage = `${errorMessage}: ${response.statusText || response.status}`;
+            }
+            throw new Error(errorMessage);
+        }
+
+        const result = await response.json();
+
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+        modal.hide();
+
+        // Show success message
+        const successAlert = document.createElement('div');
+        successAlert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+        successAlert.style.zIndex = '9999';
+        successAlert.innerHTML = `
+            <i class="bi bi-check-circle"></i> Project "${deleteProjectNameExpected}" has been deleted successfully
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(successAlert);
+        setTimeout(() => successAlert.remove(), 5000);
+
+        // Reload projects list
+        loadProjects();
+
+    } catch (err) {
+        console.error('Error deleting project:', err);
+
+        // Show error in a more visible way
+        const errorAlert = document.createElement('div');
+        errorAlert.className = 'alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
+        errorAlert.style.zIndex = '9999';
+        errorAlert.innerHTML = `
+            <i class="bi bi-exclamation-triangle"></i> <strong>Failed to delete project:</strong><br>
+            ${err.message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(errorAlert);
+
+        // Re-enable button
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+
+        // Keep modal open so user can try again
     }
 }
 </script>

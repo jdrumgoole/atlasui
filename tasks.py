@@ -163,6 +163,26 @@ def stop(c):
 
 
 @task
+def kill_port(c, port=8000):
+    """
+    Kill any process running on a specific port.
+
+    Args:
+        port: Port number to kill process on (default: 8000)
+    """
+    print(f"Killing process on port {port}...")
+    result = c.run(f"lsof -ti:{port}", warn=True, hide=True)
+
+    if result and result.stdout.strip():
+        pids = result.stdout.strip()
+        print(f"  Found process(es): {pids}")
+        c.run(f"lsof -ti:{port} | xargs kill -9", warn=True)
+        print(f"✓ Process(es) on port {port} killed")
+    else:
+        print(f"  No process found on port {port}")
+
+
+@task
 def restart(c, host="0.0.0.0", port=8000):
     """
     Restart the web server.
