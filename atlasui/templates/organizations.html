@@ -1,0 +1,782 @@
+{% extends "base.html" %}
+
+{% block title %}Organizations - AtlasUI{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h1><i class="bi bi-diagram-3"></i> Atlas Organizations</h1>
+            <div>
+                <button class="btn btn-success btn-sm me-2" id="addOrgBtn" data-bs-toggle="modal" data-bs-target="#addOrgModal">
+                    <i class="bi bi-plus-circle"></i> Add Organization
+                </button>
+                <button class="btn btn-outline-primary btn-sm" id="expandAll">
+                    <i class="bi bi-arrows-expand"></i> Expand All
+                </button>
+                <button class="btn btn-outline-secondary btn-sm" id="collapseAll">
+                    <i class="bi bi-arrows-collapse"></i> Collapse All
+                </button>
+                <button class="btn btn-outline-success btn-sm" id="refreshTree">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading indicator -->
+        <div id="loadingIndicator" class="text-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading hierarchy...</p>
+        </div>
+
+        <!-- Error message -->
+        <div id="errorMessage" class="alert alert-danger d-none" role="alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span id="errorText"></span>
+        </div>
+
+        <!-- Tree container -->
+        <div id="hierarchyTree" class="hierarchy-tree d-none">
+            <!-- Tree will be dynamically generated here -->
+        </div>
+    </div>
+</div>
+
+<!-- Add Organization Modal -->
+<div class="modal fade" id="addOrgModal" tabindex="-1" aria-labelledby="addOrgModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addOrgModalLabel">
+                    <i class="bi bi-plus-circle"></i> Add New Organization
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addOrgForm">
+                    <div class="mb-3">
+                        <label for="orgName" class="form-label">Organization Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="orgName" name="name" required
+                               placeholder="Enter organization name">
+                        <div class="form-text">The name of your new MongoDB Atlas organization</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="restrictEmployeeAccess" name="restrictEmployeeAccess">
+                            <label class="form-check-label" for="restrictEmployeeAccess">
+                                Restrict Employee Access
+                            </label>
+                            <div class="form-text">Prevent MongoDB employees from accessing this organization</div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-info small">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Note:</strong> Creating organizations requires appropriate permissions in your Atlas account.
+                    </div>
+
+                    <div id="addOrgError" class="alert alert-danger d-none"></div>
+                    <div id="addOrgSuccess" class="alert alert-success d-none"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="submitOrgBtn">
+                    <i class="bi bi-plus-circle"></i> Create Organization
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Details Panel (Offcanvas) -->
+<div class="offcanvas offcanvas-end offcanvas-wide" tabindex="-1" id="detailsPanel" aria-labelledby="detailsPanelLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title" id="detailsPanelLabel">
+            <i class="bi bi-info-circle"></i> Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div id="detailsContent">
+            <p class="text-muted">Click on any item in the hierarchy to view its details</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    h1 {
+        font-size: 1.25rem;
+    }
+
+    .offcanvas-wide {
+        width: 600px !important;
+        max-width: 90vw;
+    }
+
+    .hierarchy-tree {
+        font-size: 15px;
+    }
+
+    .tree-node {
+        margin: 4px 0;
+        padding: 6px 12px;
+        border-left: 2px solid #e0e0e0;
+        transition: all 0.2s;
+    }
+
+    .tree-node:hover {
+        background-color: #f8f9fa;
+        border-left-color: #00684a;
+    }
+
+    .tree-node-header {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .tree-node-header:hover .tree-node-name {
+        color: #00684a;
+    }
+
+    .tree-expand-icon {
+        width: 20px;
+        text-align: center;
+        transition: transform 0.2s;
+        cursor: pointer;
+    }
+
+    .tree-expand-icon.expanded {
+        transform: rotate(90deg);
+    }
+
+    .tree-node-icon {
+        width: 24px;
+        text-align: center;
+    }
+
+    .tree-node-name {
+        font-weight: 500;
+    }
+
+    .tree-node-link {
+        text-decoration: none;
+        color: inherit;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .tree-node-link:hover .tree-node-name {
+        color: #00684a;
+        text-decoration: underline;
+    }
+
+    .tree-node-badge {
+        font-size: 11px;
+        padding: 2px 8px;
+    }
+
+    .tree-node-children {
+        margin-left: 24px;
+        display: none;
+    }
+
+    .tree-node-children.show {
+        display: block;
+    }
+
+    .org-node {
+        border-left-color: #dc3545;
+    }
+
+    .project-node {
+        border-left-color: #0d6efd;
+    }
+
+    .cluster-node {
+        border-left-color: #00684a;
+    }
+
+    .tree-node-info {
+        margin-left: 52px;
+        font-size: 12px;
+        color: #6c757d;
+        margin-top: 4px;
+    }
+
+    /* Make error and success messages wrap long URLs properly */
+    #addOrgError, #addOrgSuccess {
+        word-break: break-word;
+        overflow-wrap: break-word;
+    }
+
+    #addOrgError a, #addOrgSuccess a {
+        word-break: break-all;
+        overflow-wrap: anywhere;
+    }
+</style>
+
+<script>
+let hierarchyData = null;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadHierarchy();
+
+    document.getElementById('expandAll').addEventListener('click', expandAll);
+    document.getElementById('collapseAll').addEventListener('click', collapseAll);
+    document.getElementById('refreshTree').addEventListener('click', loadHierarchy);
+    document.getElementById('submitOrgBtn').addEventListener('click', handleAddOrganization);
+
+    // Reset form when modal is closed
+    const addOrgModal = document.getElementById('addOrgModal');
+    addOrgModal.addEventListener('hidden.bs.modal', function () {
+        // Reset the form
+        document.getElementById('addOrgForm').reset();
+
+        // Clear error and success messages
+        document.getElementById('addOrgError').classList.add('d-none');
+        document.getElementById('addOrgSuccess').classList.add('d-none');
+
+        // Reset submit button
+        const submitBtn = document.getElementById('submitOrgBtn');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Create Organization';
+    });
+});
+
+async function fetchAllPages(url) {
+    /**
+     * Fetch all pages of results from a paginated API endpoint.
+     *
+     * @param {string} url - The base URL to fetch from
+     * @returns {Array} - Combined results from all pages
+     */
+    let allResults = [];
+    let pageNum = 1;
+    let totalCount = 0;
+
+    do {
+        const response = await fetch(`${url}${url.includes('?') ? '&' : '?'}pageNum=${pageNum}&itemsPerPage=100`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch from ${url}`);
+        }
+
+        const data = await response.json();
+        const results = data.results || [];
+        allResults = allResults.concat(results);
+
+        totalCount = data.totalCount || 0;
+        pageNum++;
+
+        // Continue fetching if there are more results
+    } while (allResults.length < totalCount);
+
+    return allResults;
+}
+
+async function loadHierarchy() {
+    const loading = document.getElementById('loadingIndicator');
+    const error = document.getElementById('errorMessage');
+    const tree = document.getElementById('hierarchyTree');
+
+    loading.classList.remove('d-none');
+    error.classList.add('d-none');
+    tree.classList.add('d-none');
+
+    try {
+        // Fetch all organizations (with pagination support)
+        const organizations = await fetchAllPages('/api/organizations/');
+
+        hierarchyData = {
+            organizations: organizations
+        };
+
+        // For each organization, fetch all its projects
+        for (let org of hierarchyData.organizations) {
+            org.projects = await fetchAllPages(`/api/organizations/${org.id}/projects`);
+
+            // For each project, fetch all its clusters
+            for (let project of org.projects) {
+                project.clusters = await fetchAllPages(`/api/clusters/${project.id}`);
+            }
+        }
+
+        renderTree();
+        loading.classList.add('d-none');
+        tree.classList.remove('d-none');
+
+    } catch (err) {
+        console.error('Error loading hierarchy:', err);
+        loading.classList.add('d-none');
+        error.classList.remove('d-none');
+        document.getElementById('errorText').textContent = err.message;
+    }
+}
+
+async function handleAddOrganization() {
+    const submitBtn = document.getElementById('submitOrgBtn');
+    const errorDiv = document.getElementById('addOrgError');
+    const successDiv = document.getElementById('addOrgSuccess');
+    const form = document.getElementById('addOrgForm');
+
+    // Get form values
+    const orgName = document.getElementById('orgName').value.trim();
+    const restrictEmployeeAccess = document.getElementById('restrictEmployeeAccess').checked;
+
+    // Validate
+    if (!orgName) {
+        errorDiv.textContent = 'Organization name is required';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+
+    // Hide messages
+    errorDiv.classList.add('d-none');
+    successDiv.classList.add('d-none');
+
+    // Disable button and show loading
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Creating...';
+
+    try {
+        const response = await fetch('/api/organizations/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                name: orgName,
+                restrictEmployeeAccess: restrictEmployeeAccess
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || `Failed to create organization (${response.status})`);
+        }
+
+        const newOrg = await response.json();
+
+        // Show success message
+        successDiv.textContent = `Organization "${orgName}" created successfully!`;
+        successDiv.classList.remove('d-none');
+
+        // Reset form
+        form.reset();
+
+        // Reload hierarchy after a short delay
+        setTimeout(() => {
+            bootstrap.Modal.getInstance(document.getElementById('addOrgModal')).hide();
+            loadHierarchy();
+        }, 1500);
+
+    } catch (err) {
+        console.error('Error creating organization:', err);
+        // Convert URLs in error message to clickable links
+        const messageWithLinks = makeUrlsClickable(err.message);
+        errorDiv.innerHTML = messageWithLinks;
+        errorDiv.classList.remove('d-none');
+    } finally {
+        // Re-enable button
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="bi bi-plus-circle"></i> Create Organization';
+    }
+}
+
+function makeUrlsClickable(text) {
+    /**
+     * Convert URLs in text to clickable links.
+     * Escapes HTML to prevent XSS while preserving URL functionality.
+     */
+    // Escape HTML entities first
+    const escapeHtml = (str) => {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    };
+
+    const escapedText = escapeHtml(text);
+
+    // Regex to match URLs
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+
+    // Replace URLs with clickable links
+    return escapedText.replace(urlRegex, (url) => {
+        return `<a href="${url}" target="_blank" rel="noopener noreferrer" class="alert-link">${url}</a>`;
+    });
+}
+
+function renderTree() {
+    const container = document.getElementById('hierarchyTree');
+    container.innerHTML = '';
+
+    if (!hierarchyData || !hierarchyData.organizations || hierarchyData.organizations.length === 0) {
+        container.innerHTML = '<div class="alert alert-info"><i class="bi bi-info-circle"></i> No organizations found</div>';
+        return;
+    }
+
+    hierarchyData.organizations.forEach(org => {
+        container.appendChild(createOrgNode(org));
+    });
+}
+
+function createOrgNode(org) {
+    const node = document.createElement('div');
+    node.className = 'tree-node org-node';
+    node.dataset.type = 'organization';
+    node.dataset.id = org.id;
+    node.dataset.data = JSON.stringify(org);  // Store full object data
+
+    const projectCount = org.projects ? org.projects.length : 0;
+    const orgName = org.name || org.id;
+
+    node.innerHTML = `
+        <div class="tree-node-header">
+            <span class="tree-expand-icon ${projectCount > 0 ? '' : 'invisible'}">
+                <i class="bi bi-chevron-right"></i>
+            </span>
+            <span class="tree-node-icon">
+                <i class="bi bi-building text-danger"></i>
+            </span>
+            <a href="/organizations/${encodeURIComponent(orgName)}/projects" class="tree-node-link">
+                <span class="tree-node-name">${orgName}</span>
+            </a>
+            <span class="badge bg-danger tree-node-badge">${projectCount} projects</span>
+        </div>
+        <div class="tree-node-info">ID: ${org.id}</div>
+        <div class="tree-node-children"></div>
+    `;
+
+    setupNodeEvents(node);
+
+    // Append project nodes as actual DOM elements to preserve event handlers
+    if (org.projects && org.projects.length > 0) {
+        const childrenContainer = node.querySelector('.tree-node-children');
+        org.projects.forEach(project => {
+            childrenContainer.appendChild(createProjectNode(project, org));
+        });
+    }
+
+    return node;
+}
+
+function createProjectNode(project, org) {
+    const node = document.createElement('div');
+    node.className = 'tree-node project-node';
+    node.dataset.type = 'project';
+    node.dataset.id = project.id;
+    node.dataset.data = JSON.stringify(project);  // Store full object data
+
+    const clusterCount = project.clusters ? project.clusters.length : 0;
+
+    node.innerHTML = `
+        <div class="tree-node-header">
+            <span class="tree-expand-icon ${clusterCount > 0 ? '' : 'invisible'}">
+                <i class="bi bi-chevron-right"></i>
+            </span>
+            <span class="tree-node-icon">
+                <i class="bi bi-folder text-primary"></i>
+            </span>
+            <a href="/projects/${encodeURIComponent(project.name)}" class="tree-node-link">
+                <span class="tree-node-name">${project.name}</span>
+            </a>
+            <span class="badge bg-primary tree-node-badge">${clusterCount} clusters</span>
+        </div>
+        <div class="tree-node-info">ID: ${project.id}</div>
+        <div class="tree-node-children"></div>
+    `;
+
+    setupNodeEvents(node);
+
+    // Append cluster nodes as actual DOM elements to preserve event handlers
+    if (project.clusters && project.clusters.length > 0) {
+        const childrenContainer = node.querySelector('.tree-node-children');
+        project.clusters.forEach(cluster => {
+            childrenContainer.appendChild(createClusterNode(cluster));
+        });
+    }
+
+    return node;
+}
+
+function createClusterNode(cluster) {
+    const node = document.createElement('div');
+    node.className = 'tree-node cluster-node';
+    node.dataset.type = 'cluster';
+    node.dataset.name = cluster.name;
+    node.dataset.data = JSON.stringify(cluster);  // Store full object data
+
+    // Count replica sets from replicationSpecs
+    const replicaSetCount = cluster.replicationSpecs ? cluster.replicationSpecs.length : 0;
+
+    // Only show badge if there are multiple replica sets (more than 1)
+    const replicaSetBadge = replicaSetCount > 1
+        ? `<span class="badge bg-success tree-node-badge">${replicaSetCount} replica sets</span>`
+        : '';
+
+    node.innerHTML = `
+        <div class="tree-node-header">
+            <span class="tree-expand-icon invisible">
+                <i class="bi bi-chevron-right"></i>
+            </span>
+            <span class="tree-node-icon">
+                <i class="bi bi-hdd-rack text-success"></i>
+            </span>
+            <span class="tree-node-name">${cluster.name}</span>
+            ${replicaSetBadge}
+        </div>
+        <div class="tree-node-info">
+            ${cluster.clusterType || 'N/A'} •
+            ${cluster.mongoDBVersion || 'N/A'} •
+            ${cluster.providerSettings?.instanceSizeName || 'N/A'}
+        </div>
+    `;
+
+    setupNodeEvents(node);
+    return node;
+}
+
+function setupNodeEvents(node) {
+    const header = node.querySelector('.tree-node-header');
+    const expandIcon = node.querySelector('.tree-expand-icon');
+    const children = node.querySelector('.tree-node-children');
+
+    if (expandIcon && !expandIcon.classList.contains('invisible')) {
+        expandIcon.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleNode(node);
+        });
+    }
+
+    header.addEventListener('click', function(e) {
+        // Don't show details if clicking on a link
+        if (e.target.tagName === 'A' || e.target.closest('a')) {
+            return;
+        }
+        if (e.target === header || e.target.classList.contains('tree-node-name')) {
+            showDetails(node);
+        }
+    });
+}
+
+function toggleNode(node) {
+    const expandIcon = node.querySelector('.tree-expand-icon i');
+    const children = node.querySelector('.tree-node-children');
+
+    if (children) {
+        if (children.classList.contains('show')) {
+            children.classList.remove('show');
+            expandIcon.parentElement.classList.remove('expanded');
+        } else {
+            children.classList.add('show');
+            expandIcon.parentElement.classList.add('expanded');
+        }
+    }
+}
+
+function expandAll() {
+    document.querySelectorAll('.tree-node-children').forEach(el => {
+        el.classList.add('show');
+    });
+    document.querySelectorAll('.tree-expand-icon').forEach(el => {
+        el.classList.add('expanded');
+    });
+}
+
+function collapseAll() {
+    document.querySelectorAll('.tree-node-children').forEach(el => {
+        el.classList.remove('show');
+    });
+    document.querySelectorAll('.tree-expand-icon').forEach(el => {
+        el.classList.remove('expanded');
+    });
+}
+
+function showDetails(node) {
+    const type = node.dataset.type;
+    const detailsContent = document.getElementById('detailsContent');
+
+    // Get the full object data
+    const data = JSON.parse(node.dataset.data);
+
+    let html = `<h5 class="text-capitalize mb-3">
+        <i class="bi bi-${getTypeIcon(type)}"></i> ${type} Details
+    </h5>`;
+
+    // Render based on type
+    if (type === 'organization') {
+        html += renderOrganizationDetails(data);
+    } else if (type === 'project') {
+        html += renderProjectDetails(data);
+    } else if (type === 'cluster') {
+        html += renderClusterDetails(data);
+    }
+
+    detailsContent.innerHTML = html;
+
+    const offcanvas = new bootstrap.Offcanvas(document.getElementById('detailsPanel'));
+    offcanvas.show();
+}
+
+function getTypeIcon(type) {
+    const icons = {
+        'organization': 'building',
+        'project': 'folder',
+        'cluster': 'hdd-rack'
+    };
+    return icons[type] || 'info-circle';
+}
+
+function renderOrganizationDetails(org) {
+    return `
+        <div class="mb-3">
+            <h6 class="text-muted">Basic Information</h6>
+            <table class="table table-sm">
+                <tbody>
+                    <tr><th>Name</th><td>${org.name || 'N/A'}</td></tr>
+                    <tr><th>ID</th><td><code class="small">${org.id}</code></td></tr>
+                    <tr><th>Is Deleted</th><td>${org.isDeleted ? 'Yes' : 'No'}</td></tr>
+                    <tr><th>Skip Default Alerts</th><td>${org.skipDefaultAlertsSettings ? 'Yes' : 'No'}</td></tr>
+                    ${org.projects ? `<tr><th>Projects</th><td>${org.projects.length}</td></tr>` : ''}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function renderProjectDetails(project) {
+    return `
+        <div class="mb-3">
+            <h6 class="text-muted">Basic Information</h6>
+            <table class="table table-sm">
+                <tbody>
+                    <tr><th>Name</th><td>${project.name}</td></tr>
+                    <tr><th>ID</th><td><code class="small">${project.id}</code></td></tr>
+                    <tr><th>Organization ID</th><td><code class="small">${project.orgId}</code></td></tr>
+                    <tr><th>Cluster Count</th><td>${project.clusterCount || 0}</td></tr>
+                    <tr><th>Created</th><td>${new Date(project.created).toLocaleString()}</td></tr>
+                    <tr><th>Default Alerts</th><td>${project.withDefaultAlertsSettings ? 'Enabled' : 'Disabled'}</td></tr>
+                </tbody>
+            </table>
+        </div>
+        ${project.tags && project.tags.length > 0 ? `
+            <div class="mb-3">
+                <h6 class="text-muted">Tags</h6>
+                ${project.tags.map(tag => `<span class="badge bg-secondary me-1">${tag}</span>`).join('')}
+            </div>
+        ` : ''}
+    `;
+}
+
+function renderClusterDetails(cluster) {
+    return `
+        <div class="mb-3">
+            <h6 class="text-muted">Basic Information</h6>
+            <table class="table table-sm">
+                <tbody>
+                    <tr><th>Name</th><td>${cluster.name}</td></tr>
+                    <tr><th>State</th><td><span class="badge ${getStatusBadgeClass(cluster.stateName)}">${cluster.stateName || 'UNKNOWN'}</span></td></tr>
+                    <tr><th>Type</th><td>${cluster.clusterType || 'N/A'}</td></tr>
+                    <tr><th>MongoDB Version</th><td>${cluster.mongoDBVersion || 'N/A'}</td></tr>
+                    ${cluster.mongoDBMajorVersion ? `<tr><th>Major Version</th><td>${cluster.mongoDBMajorVersion}</td></tr>` : ''}
+                    ${cluster.createDate ? `<tr><th>Created</th><td>${new Date(cluster.createDate).toLocaleString()}</td></tr>` : ''}
+                </tbody>
+            </table>
+        </div>
+        ${cluster.providerSettings ? `
+            <div class="mb-3">
+                <h6 class="text-muted">Provider Settings</h6>
+                <table class="table table-sm">
+                    <tbody>
+                        <tr><th>Provider</th><td>${cluster.providerSettings.providerName || 'N/A'}</td></tr>
+                        <tr><th>Instance Size</th><td>${cluster.providerSettings.instanceSizeName || 'N/A'}</td></tr>
+                        <tr><th>Region</th><td>${cluster.providerSettings.regionName || 'N/A'}</td></tr>
+                        ${cluster.providerSettings.diskIOPS ? `<tr><th>Disk IOPS</th><td>${cluster.providerSettings.diskIOPS}</td></tr>` : ''}
+                        ${cluster.providerSettings.diskSizeGB ? `<tr><th>Disk Size</th><td>${cluster.providerSettings.diskSizeGB} GB</td></tr>` : ''}
+                        ${cluster.providerSettings.volumeType ? `<tr><th>Volume Type</th><td>${cluster.providerSettings.volumeType}</td></tr>` : ''}
+                    </tbody>
+                </table>
+            </div>
+        ` : ''}
+        ${cluster.replicationSpecs && cluster.replicationSpecs.length > 0 ? `
+            <div class="mb-3">
+                <h6 class="text-muted">Replication Specs</h6>
+                ${cluster.replicationSpecs.map((spec, idx) => `
+                    <div class="card mb-2">
+                        <div class="card-body p-2">
+                            <small class="text-muted">Spec ${idx + 1}</small>
+                            <table class="table table-sm mb-0">
+                                <tbody>
+                                    ${spec.numShards ? `<tr><th>Shards</th><td>${spec.numShards}</td></tr>` : ''}
+                                    ${spec.zoneName ? `<tr><th>Zone</th><td>${spec.zoneName}</td></tr>` : ''}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        ` : ''}
+        ${cluster.connectionStrings ? `
+            <div class="mb-3">
+                <h6 class="text-muted">Connection Strings</h6>
+                ${cluster.connectionStrings.standard ? `
+                    <div class="mb-2">
+                        <small class="text-muted d-block">Standard</small>
+                        <code class="small d-block text-break">${formatConnectionString(cluster.connectionStrings.standard)}</code>
+                    </div>
+                ` : ''}
+                ${cluster.connectionStrings.standardSrv ? `
+                    <div class="mb-2">
+                        <small class="text-muted d-block">Standard SRV</small>
+                        <code class="small d-block text-break">${formatConnectionString(cluster.connectionStrings.standardSrv)}</code>
+                    </div>
+                ` : ''}
+            </div>
+        ` : ''}
+        ${cluster.tags && cluster.tags.length > 0 ? `
+            <div class="mb-3">
+                <h6 class="text-muted">Tags</h6>
+                ${cluster.tags.map(tag => `<span class="badge bg-secondary me-1">${tag.key}: ${tag.value}</span>`).join('')}
+            </div>
+        ` : ''}
+    `;
+}
+
+function formatConnectionString(connectionString) {
+    // Insert username:password@ placeholder after the protocol (mongodb:// or mongodb+srv://)
+    if (!connectionString) return connectionString;
+
+    // Match mongodb:// or mongodb+srv://
+    const match = connectionString.match(/^(mongodb(?:\+srv)?:\/\/)(.*)/);
+    if (match) {
+        return `${match[1]}<strong>username:password@</strong>${match[2]}`;
+    }
+    return connectionString;
+}
+
+function getStatusBadgeClass(status) {
+    switch (status) {
+        case 'IDLE':
+            return 'bg-success';
+        case 'CREATING':
+        case 'UPDATING':
+            return 'bg-warning';
+        case 'DELETING':
+        case 'DELETED':
+            return 'bg-danger';
+        case 'REPAIRING':
+            return 'bg-info';
+        default:
+            return 'bg-secondary';
+    }
+}
+</script>
+{% endblock %}

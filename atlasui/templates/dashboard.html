@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - AtlasUI{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-speedometer2"></i> MongoDB Atlas Dashboard
+        </h1>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card text-white bg-primary">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-building"></i> Organizations
+                </h5>
+                <p class="card-text display-4" id="org-count">-</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-info">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-folder"></i> Projects
+                </h5>
+                <p class="card-text display-4" id="project-count">-</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-success">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <i class="bi bi-hdd-rack"></i> Clusters
+                </h5>
+                <p class="card-text display-4" id="cluster-count">-</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-folder"></i> Recent Projects</h5>
+            </div>
+            <div class="card-body">
+                <div id="recent-projects">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-hdd-rack"></i> Cluster Status</h5>
+            </div>
+            <div class="card-body">
+                <div id="cluster-status">
+                    <div class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Load dashboard data
+async function loadDashboard() {
+    try {
+        // Load organizations
+        const orgsResponse = await fetch('/api/organizations/');
+        const orgsData = await orgsResponse.json();
+        document.getElementById('org-count').textContent = orgsData.totalCount || 0;
+
+        // Load projects
+        const projectsResponse = await fetch('/api/projects/');
+        const projectsData = await projectsResponse.json();
+        document.getElementById('project-count').textContent = projectsData.totalCount || 0;
+
+        // Count total clusters across all projects
+        let totalClusters = 0;
+        if (projectsData.results && projectsData.results.length > 0) {
+            for (const project of projectsData.results) {
+                try {
+                    const clustersResponse = await fetch(`/api/clusters/${project.id}`);
+                    const clustersData = await clustersResponse.json();
+                    totalClusters += clustersData.totalCount || 0;
+                } catch (err) {
+                    console.warn(`Failed to load clusters for project ${project.id}`);
+                }
+            }
+        }
+        document.getElementById('cluster-count').textContent = totalClusters;
+
+        // Display recent projects
+        const projectsList = document.getElementById('recent-projects');
+        if (projectsData.results && projectsData.results.length > 0) {
+            projectsList.innerHTML = '<ul class="list-group list-group-flush">' +
+                projectsData.results.slice(0, 5).map(p =>
+                    `<li class="list-group-item">
+                        <a href="/projects/${p.id}">${p.name}</a>
+                        <small class="text-muted d-block">${p.id}</small>
+                    </li>`
+                ).join('') + '</ul>';
+        } else {
+            projectsList.innerHTML = '<p class="text-muted">No projects found</p>';
+        }
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+        document.getElementById('org-count').textContent = 'Error';
+        document.getElementById('project-count').textContent = 'Error';
+        document.getElementById('cluster-count').textContent = 'Error';
+    }
+}
+
+// Load dashboard on page load
+document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
+{% endblock %}

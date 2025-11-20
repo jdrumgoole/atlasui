@@ -1,0 +1,4 @@
+- In Atlas the top level object is the Organization. Any given user can create or be a member of multiple organizations. Each user can create mutliple organizations. Within each organization there can  be multiple projects. An organization owner and administrator can create projects. Without each project their can be multiple Clusters. Each Cluster stands alone and represents a container for databases. Each cluster may have one or more users associated with it. Each user at the cluster level has a username and a password.
+- when stopping and starting the server use the atlasgui script to start and stop the server
+- use inv start and inv stop to start and stop the server processes
+- we do not render links fields in the REST API for Atlas as these are used for pagination of data

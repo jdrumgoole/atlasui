@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}All Projects - AtlasUI{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h1><i class="bi bi-folder"></i> All Projects</h1>
+            <button class="btn btn-outline-success btn-sm" id="refreshBtn">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+
+        <!-- Loading indicator -->
+        <div id="loadingIndicator" class="text-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading projects...</p>
+        </div>
+
+        <!-- Error message -->
+        <div id="errorMessage" class="alert alert-danger d-none" role="alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span id="errorText"></span>
+        </div>
+
+        <!-- Projects table -->
+        <div id="projectsTable" class="d-none">
+            <div id="projectsContainer">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Details Panel (Offcanvas) -->
+<div class="offcanvas offcanvas-end offcanvas-wide" tabindex="-1" id="detailsPanel" aria-labelledby="detailsPanelLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title" id="detailsPanelLabel">
+            <i class="bi bi-info-circle"></i> Project Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div id="detailsContent">
+            <p class="text-muted">Click on a project Details button to view its details</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    .offcanvas-wide {
+        width: 600px !important;
+        max-width: 90vw;
+    }
+
+    .project-name-link {
+        cursor: pointer;
+        color: #00684a;
+        text-decoration: none;
+    }
+
+    .project-name-link:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<script>
+let projects = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadProjects();
+    document.getElementById('refreshBtn').addEventListener('click', loadProjects);
+});
+
+async function loadProjects() {
+    const loading = document.getElementById('loadingIndicator');
+    const error = document.getElementById('errorMessage');
+    const table = document.getElementById('projectsTable');
+
+    loading.classList.remove('d-none');
+    error.classList.add('d-none');
+    table.classList.add('d-none');
+
+    try {
+        // Fetch all organizations
+        const orgsResponse = await fetch('/api/organizations/?itemsPerPage=500');
+        if (!orgsResponse.ok) throw new Error('Failed to fetch organizations');
+        const orgsData = await orgsResponse.json();
+
+        // Fetch all projects for each organization
+        const allProjects = [];
+        for (let org of orgsData.results || []) {
+            const projectsResponse = await fetch(`/api/organizations/${org.id}/projects?itemsPerPage=500`);
+            if (projectsResponse.ok) {
+                const projectsData = await projectsResponse.json();
+                // Add organization name to each project
+                (projectsData.results || []).forEach(project => {
+                    project.orgName = org.name;
+                    project.orgId = org.id;
+                    allProjects.push(project);
+                });
+            }
+        }
+
+        projects = allProjects;
+
+        renderProjects();
+        loading.classList.add('d-none');
+        table.classList.remove('d-none');
+
+    } catch (err) {
+        console.error('Error loading projects:', err);
+        loading.classList.add('d-none');
+        error.classList.remove('d-none');
+        document.getElementById('errorText').textContent = err.message;
+    }
+}
+
+function renderProjects() {
+    const container = document.getElementById('projectsContainer');
+    container.innerHTML = '';
+
+    if (projects.length === 0) {
+        container.innerHTML = '<div class="alert alert-info">No projects found</div>';
+        return;
+    }
+
+    // Create table for projects
+    const tableDiv = document.createElement('div');
+    tableDiv.className = 'table-responsive';
+    tableDiv.innerHTML = `
+        <table class="table table-striped table-hover">
+            <thead>
+                <tr>
+                    <th>Organization</th>
+                    <th>Project Name</th>
+                    <th>Clusters</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    `;
+
+    const tbody = tableDiv.querySelector('tbody');
+
+    projects.forEach(project => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <a href="/organizations/${encodeURIComponent(project.orgName)}/projects" class="text-decoration-none">
+                    <i class="bi bi-building"></i> ${project.orgName}
+                </a>
+            </td>
+            <td>
+                <a href="javascript:void(0)" class="project-name-link" onclick="showProjectDetails('${project.id}')">
+                    <strong>${project.name}</strong>
+                </a>
+            </td>
+            <td>
+                <a href="/projects/${encodeURIComponent(project.name)}" class="text-decoration-none">
+                    <span class="badge bg-primary">${project.clusterCount || 0}</span>
+                </a>
+            </td>
+            <td>${new Date(project.created).toLocaleDateString()}</td>
+            <td>
+                <button class="btn btn-sm btn-outline-info" onclick="showProjectDetails('${project.id}')">
+                    <i class="bi bi-info-circle"></i> Details
+                </button>
+            </td>
+        `;
+
+        tbody.appendChild(row);
+    });
+
+    container.appendChild(tableDiv);
+}
+
+async function showProjectDetails(projectId) {
+    // Find project in the projects array
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+
+    const detailsContent = document.getElementById('detailsContent');
+
+    // Show loading state
+    detailsContent.innerHTML = `
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading project details...</p>
+        </div>
+    `;
+
+    // Open the offcanvas immediately
+    const offcanvas = new bootstrap.Offcanvas(document.getElementById('detailsPanel'));
+    offcanvas.show();
+
+    try {
+        // Fetch all related data in parallel
+        const [clustersData, usersData] = await Promise.all([
+            fetch(`/api/clusters/${project.id}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+            fetch(`/api/users/${project.id}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] }))
+        ]);
+
+        const clusters = clustersData.results || [];
+        const users = usersData.results || [];
+
+        // Build comprehensive details HTML
+        let html = `
+            <h5 class="mb-3">
+                <i class="bi bi-folder"></i> ${project.name}
+            </h5>
+
+            <div class="mb-3">
+                <h6 class="text-muted">Basic Information</h6>
+                <table class="table table-sm">
+                    <tbody>
+                        <tr><th>Name</th><td>${project.name}</td></tr>
+                        <tr><th>Organization</th><td><a href="/organizations/${encodeURIComponent(project.orgName)}/projects">${project.orgName}</a></td></tr>
+                        <tr><th>ID</th><td><code class="small">${project.id}</code></td></tr>
+                        <tr><th>Organization ID</th><td><code class="small">${project.orgId}</code></td></tr>
+                        <tr><th>Cluster Count</th><td>${project.clusterCount || 0}</td></tr>
+                        <tr><th>Database Users</th><td>${users.length}</td></tr>
+                        <tr><th>Created</th><td>${new Date(project.created).toLocaleString()}</td></tr>
+                        <tr><th>Default Alerts</th><td>${project.withDefaultAlertsSettings ? 'Enabled' : 'Disabled'}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        // Add tags section if available
+        if (project.tags && project.tags.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Tags</h6>
+                    ${project.tags.map(tag => `<span class="badge bg-secondary me-1">${tag}</span>`).join('')}
+                </div>
+            `;
+        }
+
+        // Add clusters section
+        if (clusters.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Clusters (${clusters.length})</h6>
+                    <div class="list-group list-group-flush">
+                        ${clusters.map(cluster => `
+                            <div class="list-group-item py-2 px-2">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong><i class="bi bi-hdd-rack"></i> ${cluster.name}</strong>
+                                        <div class="small text-muted">
+                                            ${cluster.clusterType || 'N/A'} •
+                                            ${cluster.mongoDBVersion || 'N/A'} •
+                                            ${cluster.providerSettings?.providerName || 'N/A'}
+                                        </div>
+                                    </div>
+                                    <span class="badge ${getStatusBadgeClass(cluster.stateName)}">${cluster.stateName || 'UNKNOWN'}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Clusters</h6>
+                    <p class="small text-muted">No clusters in this project</p>
+                </div>
+            `;
+        }
+
+        // Add database users section
+        if (users.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Database Users (${users.length})</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Database</th>
+                                    <th>Roles</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${users.map(user => `
+                                    <tr>
+                                        <td><strong>${user.username}</strong></td>
+                                        <td><code class="small">${user.databaseName || 'admin'}</code></td>
+                                        <td>
+                                            ${user.roles && user.roles.length > 0 ?
+                                                user.roles.map(role => `<span class="badge bg-secondary me-1">${role.roleName}</span>`).join('') :
+                                                '<span class="text-muted">No roles</span>'
+                                            }
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Database Users</h6>
+                    <p class="small text-muted">No database users in this project</p>
+                </div>
+            `;
+        }
+
+        detailsContent.innerHTML = html;
+
+    } catch (err) {
+        console.error('Error loading project details:', err);
+        detailsContent.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                Failed to load project details: ${err.message}
+            </div>
+        `;
+    }
+}
+
+function getStatusBadgeClass(status) {
+    switch (status) {
+        case 'IDLE':
+            return 'bg-success';
+        case 'CREATING':
+        case 'UPDATING':
+            return 'bg-warning';
+        case 'DELETING':
+        case 'DELETED':
+            return 'bg-danger';
+        case 'REPAIRING':
+            return 'bg-info';
+        default:
+            return 'bg-secondary';
+    }
+}
+</script>
+{% endblock %}

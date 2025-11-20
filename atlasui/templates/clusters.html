@@ -1,0 +1,777 @@
+{% extends "base.html" %}
+
+{% block title %}Clusters - AtlasUI{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- Breadcrumb -->
+        <nav aria-label="breadcrumb" class="mb-2">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/organizations">Organizations</a></li>
+                <li class="breadcrumb-item"><span id="orgNameBreadcrumb">...</span></li>
+                <li class="breadcrumb-item active" aria-current="page"><span id="projectNameBreadcrumb">...</span></li>
+            </ol>
+        </nav>
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h1><i class="bi bi-hdd-rack"></i> Clusters</h1>
+            <button class="btn btn-outline-success btn-sm" id="refreshBtn">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+
+        <script>
+            const PROJECT_ID_OR_NAME = "{{ project_id_or_name }}";
+        </script>
+
+        <!-- Loading indicator -->
+        <div id="loadingIndicator" class="text-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading clusters...</p>
+        </div>
+
+        <!-- Error message -->
+        <div id="errorMessage" class="alert alert-danger d-none" role="alert">
+            <i class="bi bi-exclamation-triangle"></i>
+            <span id="errorText"></span>
+        </div>
+
+        <!-- Clusters table -->
+        <div id="clustersTable" class="d-none">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Status</th>
+                            <th>Type</th>
+                            <th>MongoDB</th>
+                            <th>Provider</th>
+                            <th>Region</th>
+                            <th>Instance</th>
+                            <th>Users</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clustersContainer">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Login Modal -->
+<div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="loginModalLabel">
+                    <i class="bi bi-key"></i> Login to Cluster
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="loginError" class="alert alert-danger d-none"></div>
+                <div id="loginSuccess" class="alert alert-success d-none"></div>
+
+                <form id="loginForm">
+                    <input type="hidden" id="clusterConnectionString" />
+                    <input type="hidden" id="clusterName" />
+
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" required autocomplete="username">
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" required autocomplete="current-password">
+                    </div>
+                </form>
+
+                <!-- Databases list (shown after successful login) -->
+                <div id="databasesList" class="d-none mt-3">
+                    <h6>Databases:</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Collections</th>
+                                    <th>Indexes</th>
+                                    <th>Size</th>
+                                </tr>
+                            </thead>
+                            <tbody id="databasesTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="loginBtn">
+                    <i class="bi bi-box-arrow-in-right"></i> Login
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add User Modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addUserModalLabel">
+                    <i class="bi bi-person-plus"></i> Add Database User
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="addUserError" class="alert alert-danger d-none"></div>
+                <div id="addUserSuccess" class="alert alert-success d-none"></div>
+
+                <form id="addUserForm">
+                    <input type="hidden" id="addUserProjectId" />
+
+                    <div class="mb-3">
+                        <label for="newUsername" class="form-label">Username <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="newUsername" required>
+                        <div class="form-text">Database username for authentication</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="newPassword" class="form-label">Password <span class="text-danger">*</span></label>
+                        <input type="password" class="form-control" id="newPassword" required>
+                        <div class="form-text">Must be at least 8 characters</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="userRole" class="form-label">Role <span class="text-danger">*</span></label>
+                        <select class="form-select" id="userRole" required>
+                            <option value="">Select a role...</option>
+                            <option value="readWrite">Read and Write (readWrite)</option>
+                            <option value="read">Read Only (read)</option>
+                            <option value="dbAdmin">Database Admin (dbAdmin)</option>
+                            <option value="atlasAdmin">Atlas Admin (atlasAdmin)</option>
+                        </select>
+                        <div class="form-text">User permissions on the database</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="targetDatabase" class="form-label">Target Database</label>
+                        <input type="text" class="form-control" id="targetDatabase" value="admin">
+                        <div class="form-text">Database where the role applies (default: admin)</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="addUserBtn">
+                    <i class="bi bi-person-plus"></i> Add User
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Details Panel (Offcanvas) -->
+<div class="offcanvas offcanvas-end offcanvas-wide" tabindex="-1" id="detailsPanel" aria-labelledby="detailsPanelLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title" id="detailsPanelLabel">
+            <i class="bi bi-info-circle"></i> Cluster Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div id="detailsContent">
+            <p class="text-muted">Click on a cluster name to view its details</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+    h1 {
+        font-size: 1.25rem;
+    }
+
+    .offcanvas-wide {
+        width: 600px !important;
+        max-width: 90vw;
+    }
+
+    .cluster-name-link {
+        cursor: pointer;
+        color: #00684a;
+        text-decoration: none;
+    }
+
+    .cluster-name-link:hover {
+        text-decoration: underline;
+    }
+</style>
+
+<script>
+let clusters = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadClusters();
+    document.getElementById('refreshBtn').addEventListener('click', loadClusters);
+});
+
+async function loadClusters() {
+    const loading = document.getElementById('loadingIndicator');
+    const error = document.getElementById('errorMessage');
+    const table = document.getElementById('clustersTable');
+
+    loading.classList.remove('d-none');
+    error.classList.add('d-none');
+    table.classList.add('d-none');
+
+    try {
+        // Fetch all organizations
+        const orgsResponse = await fetch('/api/organizations/');
+        if (!orgsResponse.ok) throw new Error('Failed to fetch organizations');
+        const orgsData = await orgsResponse.json();
+
+        // Find the project by ID or name across all organizations
+        let targetProject = null;
+        let targetOrg = null;
+
+        for (let org of orgsData.results || []) {
+            const projectsResponse = await fetch(`/api/organizations/${org.id}/projects?itemsPerPage=500`);
+            if (projectsResponse.ok) {
+                const projectsData = await projectsResponse.json();
+                const project = (projectsData.results || []).find(p =>
+                    p.id === PROJECT_ID_OR_NAME || p.name === PROJECT_ID_OR_NAME
+                );
+                if (project) {
+                    targetProject = project;
+                    targetOrg = org;
+                    break;
+                }
+            }
+        }
+
+        if (!targetProject) {
+            throw new Error(`Project "${PROJECT_ID_OR_NAME}" not found`);
+        }
+
+        // Update breadcrumbs
+        document.getElementById('orgNameBreadcrumb').innerHTML =
+            `<a href="/organizations/${encodeURIComponent(targetOrg.name)}/projects">${targetOrg.name}</a>`;
+        document.getElementById('projectNameBreadcrumb').textContent = targetProject.name;
+
+        // Fetch clusters for this project
+        const clustersResponse = await fetch(`/api/clusters/${targetProject.id}?itemsPerPage=500`);
+        if (!clustersResponse.ok) throw new Error('Failed to fetch clusters');
+        const clustersData = await clustersResponse.json();
+
+        // Fetch users for this project
+        let projectUsers = [];
+        try {
+            const usersResponse = await fetch(`/api/users/${targetProject.id}`);
+            if (usersResponse.ok) {
+                const usersData = await usersResponse.json();
+                projectUsers = usersData.results || [];
+            }
+        } catch (err) {
+            console.warn(`Failed to fetch users for project ${targetProject.id}:`, err);
+        }
+
+        // Add project name and users to each cluster
+        clusters = (clustersData.results || []).map(c => ({
+            ...c,
+            projectName: targetProject.name,
+            projectId: targetProject.id,
+            users: projectUsers
+        }));
+
+        renderClusters();
+        loading.classList.add('d-none');
+        table.classList.remove('d-none');
+
+    } catch (err) {
+        console.error('Error loading clusters:', err);
+        loading.classList.add('d-none');
+        error.classList.remove('d-none');
+        document.getElementById('errorText').textContent = err.message;
+    }
+}
+
+function renderClusters() {
+    const container = document.getElementById('clustersContainer');
+    container.innerHTML = '';
+
+    if (clusters.length === 0) {
+        container.innerHTML = '<tr><td colspan="9" class="text-center"><div class="alert alert-info mb-0">No clusters found</div></td></tr>';
+        return;
+    }
+
+    clusters.forEach(cluster => {
+        const row = document.createElement('tr');
+        const statusClass = getStatusBadgeClass(cluster.stateName);
+        const users = cluster.users || [];
+
+        row.innerHTML = `
+            <td>
+                <a href="javascript:void(0)" class="cluster-name-link" onclick="showClusterDetails('${cluster.id || cluster.name}')">
+                    <strong>${cluster.name}</strong>
+                </a>
+            </td>
+            <td><span class="badge ${statusClass}">${cluster.stateName || 'UNKNOWN'}</span></td>
+            <td>
+                <a href="/clusters/${encodeURIComponent(cluster.name)}/databases" class="text-decoration-none">
+                    ${cluster.clusterType || 'N/A'}
+                </a>
+            </td>
+            <td>${cluster.mongoDBVersion || 'N/A'}</td>
+            <td>${cluster.providerSettings?.providerName || 'N/A'}</td>
+            <td>${cluster.providerSettings?.regionName || 'N/A'}</td>
+            <td>${cluster.providerSettings?.instanceSizeName || 'N/A'}</td>
+            <td><span class="badge bg-secondary">${users.length}</span></td>
+            <td>
+                <button class="btn btn-sm btn-outline-success" onclick="showAddUserModal('${cluster.projectId}', '${cluster.projectName}')" title="Add User">
+                    <i class="bi bi-person-plus"></i> Add User
+                </button>
+            </td>
+        `;
+        container.appendChild(row);
+    });
+}
+
+function formatConnectionString(connectionString) {
+    // Insert username:password@ placeholder after the protocol (mongodb:// or mongodb+srv://)
+    if (!connectionString) return connectionString;
+
+    // Match mongodb:// or mongodb+srv://
+    const match = connectionString.match(/^(mongodb(?:\+srv)?:\/\/)(.*)/);
+    if (match) {
+        return `${match[1]}<strong>username:password@</strong>${match[2]}`;
+    }
+    return connectionString;
+}
+
+function getStatusBadgeClass(status) {
+    switch (status) {
+        case 'IDLE':
+            return 'bg-success';
+        case 'CREATING':
+        case 'UPDATING':
+            return 'bg-warning';
+        case 'DELETING':
+        case 'DELETED':
+            return 'bg-danger';
+        case 'REPAIRING':
+            return 'bg-info';
+        default:
+            return 'bg-secondary';
+    }
+}
+
+function showClusterDetails(clusterId) {
+    // Find cluster in the clusters array
+    const cluster = clusters.find(c => (c.id === clusterId || c.name === clusterId));
+    if (!cluster) return;
+
+    const detailsContent = document.getElementById('detailsContent');
+    const statusClass = getStatusBadgeClass(cluster.stateName);
+    const users = cluster.users || [];
+
+    // Build comprehensive details HTML
+    let html = `
+        <h5 class="mb-3">
+            <i class="bi bi-hdd-rack"></i> ${cluster.name}
+        </h5>
+
+        <div class="mb-3">
+            <span class="badge ${statusClass}">${cluster.stateName || 'UNKNOWN'}</span>
+        </div>
+
+        <div class="mb-3">
+            <h6 class="text-muted">Basic Information</h6>
+            <table class="table table-sm">
+                <tbody>
+                    <tr><th>Name</th><td>${cluster.name}</td></tr>
+                    ${cluster.id ? `<tr><th>ID</th><td><code class="small">${cluster.id}</code></td></tr>` : ''}
+                    ${cluster.groupId ? `<tr><th>Group ID</th><td><code class="small">${cluster.groupId}</code></td></tr>` : ''}
+                    <tr><th>Status</th><td><span class="badge ${statusClass}">${cluster.stateName || 'UNKNOWN'}</span></td></tr>
+                    <tr><th>Cluster Type</th><td>${cluster.clusterType || 'N/A'}</td></tr>
+                    <tr><th>MongoDB Version</th><td>${cluster.mongoDBVersion || 'N/A'}</td></tr>
+                    ${cluster.mongoDBMajorVersion ? `<tr><th>Major Version</th><td>${cluster.mongoDBMajorVersion}</td></tr>` : ''}
+                    ${cluster.createDate ? `<tr><th>Created</th><td>${new Date(cluster.createDate).toLocaleString()}</td></tr>` : ''}
+                    ${cluster.replicationFactor ? `<tr><th>Replication Factor</th><td>${cluster.replicationFactor}</td></tr>` : ''}
+                    ${cluster.numShards ? `<tr><th>Number of Shards</th><td>${cluster.numShards}</td></tr>` : ''}
+                    ${cluster.diskSizeGB ? `<tr><th>Disk Size</th><td>${cluster.diskSizeGB} GB</td></tr>` : ''}
+                    ${cluster.paused !== undefined ? `<tr><th>Paused</th><td>${cluster.paused ? 'Yes' : 'No'}</td></tr>` : ''}
+                    ${cluster.backupEnabled !== undefined ? `<tr><th>Backup Enabled</th><td>${cluster.backupEnabled ? 'Yes' : 'No'}</td></tr>` : ''}
+                    ${cluster.providerBackupEnabled !== undefined ? `<tr><th>Provider Backup</th><td>${cluster.providerBackupEnabled ? 'Yes' : 'No'}</td></tr>` : ''}
+                    ${cluster.pitEnabled !== undefined ? `<tr><th>Point-in-Time Restore</th><td>${cluster.pitEnabled ? 'Enabled' : 'Disabled'}</td></tr>` : ''}
+                    ${cluster.encryptionAtRestProvider ? `<tr><th>Encryption Provider</th><td>${cluster.encryptionAtRestProvider}</td></tr>` : ''}
+                    ${cluster.versionReleaseSystem ? `<tr><th>Version Release System</th><td>${cluster.versionReleaseSystem}</td></tr>` : ''}
+                    ${cluster.rootCertType ? `<tr><th>Root Cert Type</th><td>${cluster.rootCertType}</td></tr>` : ''}
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    // Provider settings
+    if (cluster.providerSettings) {
+        html += `
+            <div class="mb-3">
+                <h6 class="text-muted">Provider Settings</h6>
+                <table class="table table-sm">
+                    <tbody>
+                        ${cluster.providerSettings.providerName ? `<tr><th>Provider</th><td>${cluster.providerSettings.providerName}</td></tr>` : ''}
+                        ${cluster.providerSettings.regionName ? `<tr><th>Region</th><td>${cluster.providerSettings.regionName}</td></tr>` : ''}
+                        ${cluster.providerSettings.instanceSizeName ? `<tr><th>Instance Size</th><td>${cluster.providerSettings.instanceSizeName}</td></tr>` : ''}
+                        ${cluster.providerSettings.backingProviderName ? `<tr><th>Backing Provider</th><td>${cluster.providerSettings.backingProviderName}</td></tr>` : ''}
+                        ${cluster.providerSettings.diskIOPS ? `<tr><th>Disk IOPS</th><td>${cluster.providerSettings.diskIOPS}</td></tr>` : ''}
+                        ${cluster.providerSettings.encryptEBSVolume !== undefined ? `<tr><th>Encrypted EBS</th><td>${cluster.providerSettings.encryptEBSVolume ? 'Yes' : 'No'}</td></tr>` : ''}
+                        ${cluster.providerSettings.volumeType ? `<tr><th>Volume Type</th><td>${cluster.providerSettings.volumeType}</td></tr>` : ''}
+                        ${cluster.providerSettings.autoScaling ? `<tr><th>Auto Scaling</th><td>Configured</td></tr>` : ''}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // Bi-Connector
+    if (cluster.biConnector) {
+        html += `
+            <div class="mb-3">
+                <h6 class="text-muted">BI Connector</h6>
+                <table class="table table-sm">
+                    <tbody>
+                        ${cluster.biConnector.enabled !== undefined ? `<tr><th>Enabled</th><td>${cluster.biConnector.enabled ? 'Yes' : 'No'}</td></tr>` : ''}
+                        ${cluster.biConnector.readPreference ? `<tr><th>Read Preference</th><td>${cluster.biConnector.readPreference}</td></tr>` : ''}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    // Labels/Tags
+    if (cluster.labels && cluster.labels.length > 0) {
+        html += `
+            <div class="mb-3">
+                <h6 class="text-muted">Labels</h6>
+                ${cluster.labels.map(label =>
+                    `<span class="badge bg-secondary me-1">${label.key}: ${label.value}</span>`
+                ).join('')}
+            </div>
+        `;
+    }
+
+    if (cluster.tags && cluster.tags.length > 0) {
+        html += `
+            <div class="mb-3">
+                <h6 class="text-muted">Tags</h6>
+                ${cluster.tags.map(tag => `<span class="badge bg-secondary me-1">${tag}</span>`).join('')}
+            </div>
+        `;
+    }
+
+    // Connection strings
+    if (cluster.connectionStrings) {
+        html += `
+            <div class="mb-3">
+                <h6 class="text-muted">Connection Strings</h6>
+                <div class="small">
+        `;
+
+        if (cluster.connectionStrings.standardSrv) {
+            html += `
+                <div class="mb-2">
+                    <strong>Standard SRV:</strong><br>
+                    <code class="small text-break">${formatConnectionString(cluster.connectionStrings.standardSrv)}</code>
+                </div>
+            `;
+        }
+
+        if (cluster.connectionStrings.standard) {
+            html += `
+                <div class="mb-2">
+                    <strong>Standard:</strong><br>
+                    <code class="small text-break">${formatConnectionString(cluster.connectionStrings.standard)}</code>
+                </div>
+            `;
+        }
+
+        html += `</div></div>`;
+    }
+
+    // Database users
+    if (users.length > 0) {
+        html += `
+            <div class="mb-3">
+                <h6 class="text-muted">Database Users (${users.length})</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Username</th>
+                                <th>Database</th>
+                                <th>Roles</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${users.map(user => `
+                                <tr>
+                                    <td><strong>${user.username}</strong></td>
+                                    <td><code class="small">${user.databaseName || 'admin'}</code></td>
+                                    <td>
+                                        ${user.roles && user.roles.length > 0 ?
+                                            user.roles.map(role => `<span class="badge bg-secondary me-1">${role.roleName}</span>`).join('') :
+                                            '<span class="text-muted">No roles</span>'
+                                        }
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+    } else {
+        html += `
+            <div class="mb-3">
+                <h6 class="text-muted">Database Users</h6>
+                <p class="small text-muted">No database users in this project</p>
+            </div>
+        `;
+    }
+
+    detailsContent.innerHTML = html;
+
+    // Open the offcanvas
+    const offcanvas = new bootstrap.Offcanvas(document.getElementById('detailsPanel'));
+    offcanvas.show();
+}
+
+function showLoginModal(connectionString, clusterName) {
+    // Reset the form and hide messages
+    document.getElementById('loginForm').reset();
+    document.getElementById('loginError').classList.add('d-none');
+    document.getElementById('loginSuccess').classList.add('d-none');
+    document.getElementById('databasesList').classList.add('d-none');
+
+    // Set the connection string and cluster name
+    document.getElementById('clusterConnectionString').value = connectionString;
+    document.getElementById('clusterName').value = clusterName;
+
+    // Update modal title
+    document.getElementById('loginModalLabel').innerHTML = `<i class="bi bi-key"></i> Login to ${clusterName}`;
+
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('loginModal'));
+    modal.show();
+}
+
+async function loginToCluster() {
+    const loginBtn = document.getElementById('loginBtn');
+    const loginError = document.getElementById('loginError');
+    const loginSuccess = document.getElementById('loginSuccess');
+    const databasesList = document.getElementById('databasesList');
+
+    const connectionString = document.getElementById('clusterConnectionString').value;
+    const username = document.getElementById('username').value;
+    const password = document.getElementById('password').value;
+
+    if (!username || !password) {
+        loginError.textContent = 'Please enter username and password';
+        loginError.classList.remove('d-none');
+        return;
+    }
+
+    // Hide previous messages
+    loginError.classList.add('d-none');
+    loginSuccess.classList.add('d-none');
+    databasesList.classList.add('d-none');
+
+    // Show loading state
+    loginBtn.disabled = true;
+    loginBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Connecting...';
+
+    try {
+        const response = await fetch('/api/clusters/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                connection_string: connectionString,
+                username: username,
+                password: password
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Show success message
+            loginSuccess.textContent = `Successfully connected! Found ${data.total} database(s)`;
+            loginSuccess.classList.remove('d-none');
+
+            // Populate databases table
+            const tbody = document.getElementById('databasesTableBody');
+            tbody.innerHTML = '';
+
+            data.databases.forEach(db => {
+                const row = document.createElement('tr');
+                if (db.error) {
+                    row.innerHTML = `
+                        <td>${db.name}</td>
+                        <td colspan="3" class="text-danger small">${db.error}</td>
+                    `;
+                } else {
+                    row.innerHTML = `
+                        <td><strong>${db.name}</strong></td>
+                        <td>${db.collections || 0}</td>
+                        <td>${db.indexes || 0}</td>
+                        <td>${formatBytes(db.sizeOnDisk || 0)}</td>
+                    `;
+                }
+                tbody.appendChild(row);
+            });
+
+            // Show databases list
+            databasesList.classList.remove('d-none');
+
+        } else {
+            loginError.textContent = data.detail || 'Failed to connect to cluster';
+            loginError.classList.remove('d-none');
+        }
+
+    } catch (err) {
+        console.error('Login error:', err);
+        loginError.textContent = 'Failed to connect to cluster: ' + err.message;
+        loginError.classList.remove('d-none');
+    } finally {
+        // Reset button state
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = '<i class="bi bi-box-arrow-in-right"></i> Login';
+    }
+}
+
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+function showAddUserModal(projectId, projectName) {
+    // Reset the form and hide messages
+    document.getElementById('addUserForm').reset();
+    document.getElementById('addUserError').classList.add('d-none');
+    document.getElementById('addUserSuccess').classList.add('d-none');
+
+    // Set the project ID
+    document.getElementById('addUserProjectId').value = projectId;
+
+    // Update modal title
+    document.getElementById('addUserModalLabel').innerHTML =
+        `<i class="bi bi-person-plus"></i> Add Database User to ${projectName}`;
+
+    // Show the modal
+    const modal = new bootstrap.Modal(document.getElementById('addUserModal'));
+    modal.show();
+}
+
+async function addDatabaseUser() {
+    const addUserBtn = document.getElementById('addUserBtn');
+    const addUserError = document.getElementById('addUserError');
+    const addUserSuccess = document.getElementById('addUserSuccess');
+
+    const projectId = document.getElementById('addUserProjectId').value;
+    const username = document.getElementById('newUsername').value;
+    const password = document.getElementById('newPassword').value;
+    const roleName = document.getElementById('userRole').value;
+    const databaseName = document.getElementById('targetDatabase').value;
+
+    if (!username || !password || !roleName) {
+        addUserError.textContent = 'Please fill in all required fields';
+        addUserError.classList.remove('d-none');
+        return;
+    }
+
+    // Hide previous messages
+    addUserError.classList.add('d-none');
+    addUserSuccess.classList.add('d-none');
+
+    // Show loading state
+    addUserBtn.disabled = true;
+    addUserBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Adding...';
+
+    try {
+        const response = await fetch(`/api/users/${projectId}/database-users`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: username,
+                password: password,
+                databaseName: databaseName,
+                roles: [
+                    {
+                        roleName: roleName,
+                        databaseName: databaseName
+                    }
+                ]
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            // Show success message
+            addUserSuccess.textContent = `User "${username}" added successfully!`;
+            addUserSuccess.classList.remove('d-none');
+
+            // Reload clusters after a short delay to show updated users
+            setTimeout(() => {
+                bootstrap.Modal.getInstance(document.getElementById('addUserModal')).hide();
+                loadClusters();
+            }, 1500);
+
+        } else {
+            addUserError.textContent = data.detail || 'Failed to add user';
+            addUserError.classList.remove('d-none');
+        }
+
+    } catch (err) {
+        console.error('Add user error:', err);
+        addUserError.textContent = 'Failed to add user: ' + err.message;
+        addUserError.classList.remove('d-none');
+    } finally {
+        // Reset button state
+        addUserBtn.disabled = false;
+        addUserBtn.innerHTML = '<i class="bi bi-person-plus"></i> Add User';
+    }
+}
+
+// Add event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('loginBtn').addEventListener('click', loginToCluster);
+    document.getElementById('addUserBtn').addEventListener('click', addDatabaseUser);
+
+    // Allow Enter key to submit login
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        loginToCluster();
+    });
+
+    // Allow Enter key to submit add user
+    document.getElementById('addUserForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        addDatabaseUser();
+    });
+});
+</script>
+{% endblock %}

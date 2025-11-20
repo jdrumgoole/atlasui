@@ -1,0 +1,112 @@
+/* AtlasUI Custom Styles */
+
+:root {
+    --mongodb-green: #00ed64;
+    --mongodb-dark-green: #00684a;
+    --mongodb-navy: #001e2b;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+.navbar {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background-color: white;
+    border-bottom: 2px solid var(--mongodb-green);
+    font-weight: bold;
+}
+
+footer {
+    border-top: 1px solid #dee2e6;
+    margin-top: auto;
+}
+
+.table {
+    background-color: white;
+}
+
+.badge {
+    font-size: 0.85rem;
+    padding: 0.35rem 0.65rem;
+}
+
+/* Status badges */
+.badge-idle {
+    background-color: #28a745;
+}
+
+.badge-creating {
+    background-color: #ffc107;
+}
+
+.badge-updating {
+    background-color: #17a2b8;
+}
+
+.badge-error {
+    background-color: #dc3545;
+}
+
+/* Loading spinner */
+.spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+}
+
+/* Custom buttons */
+.btn-mongodb {
+    background-color: var(--mongodb-green);
+    border-color: var(--mongodb-green);
+    color: var(--mongodb-navy);
+}
+
+.btn-mongodb:hover {
+    background-color: var(--mongodb-dark-green);
+    border-color: var(--mongodb-dark-green);
+    color: white;
+}
+
+/* Cards on dashboard */
+.card.bg-primary,
+.card.bg-success,
+.card.bg-warning,
+.card.bg-info {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+/* Code blocks */
+pre {
+    background-color: #f4f4f4;
+    padding: 1rem;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+code {
+    color: #e83e8c;
+}
+
+/* Page headings */
+h1 {
+    font-size: 1.75rem;
+    font-weight: normal;
+    margin-top: 0.5rem;
+    margin-bottom: 0.75rem;
+}
