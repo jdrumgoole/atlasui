@@ -8,7 +8,7 @@ A comprehensive user interface for MongoDB Atlas, providing both a web-based UI 
 - **CLI Tool**: Command-line interface for Atlas operations
 - **Complete API Coverage**: Built from official MongoDB Atlas OpenAPI specifications
 - **Modern Stack**: FastAPI, Typer, Rich, and modern Python tooling
-- **Secure Authentication**: Supports both API keys and service accounts (recommended)
+- **Secure Authentication**: Supports both API keys (recommended for full functionality) and service accounts (project-scoped only)
 
 ## Atlas API Coverage
 
@@ -41,34 +41,11 @@ inv setup
 
 ## Configuration
 
-### Option 1: Service Account Authentication (Recommended)
+### Option 1: API Key Authentication (Recommended)
 
-Service accounts provide enhanced security with OAuth 2.0 authentication.
+**For AtlasUI, API keys are the recommended authentication method** because they provide organization-level access, which is required for this application to work correctly across all organizations, projects, and clusters.
 
-**Interactive Setup (Easiest):**
-
-```bash
-# Run interactive setup wizard
-inv configure-service-account
-
-# Or directly
-atlasui-setup
-```
-
-**Manual Setup:**
-
-```bash
-cp .env.example .env
-# Edit .env and set:
-ATLAS_AUTH_METHOD=service_account
-ATLAS_SERVICE_ACCOUNT_CREDENTIALS_FILE=/path/to/service-account.json
-```
-
-See the [Service Account Documentation](docs/service_accounts.md) for detailed instructions.
-
-### Option 2: API Key Authentication (Legacy)
-
-For development and testing:
+**Setup:**
 
 ```bash
 cp .env.example .env
@@ -79,6 +56,31 @@ ATLAS_PRIVATE_KEY=your_private_key
 ```
 
 **⚠ Important**: Never commit credentials to version control!
+
+### Option 2: Service Account Authentication (Limited Support)
+
+**⚠️ Important Limitation**: Service accounts in MongoDB Atlas are scoped to individual projects, not organizations. Since AtlasUI is designed to manage **all organizations, projects, and clusters** in your Atlas account, service accounts have limited utility for this application.
+
+**When to use service accounts:**
+- You only need to manage resources within a single project
+- You want OAuth 2.0 authentication for project-specific operations
+
+**Setup (for project-scoped operations only):**
+
+```bash
+# Interactive setup wizard
+inv configure-service-account
+
+# Manual setup
+cp .env.example .env
+# Edit .env and set:
+ATLAS_AUTH_METHOD=service_account
+ATLAS_SERVICE_ACCOUNT_CREDENTIALS_FILE=/path/to/service-account.json
+```
+
+See the [Service Account Documentation](docs/service_accounts.md) for detailed instructions.
+
+**Recommendation**: For full AtlasUI functionality across all organizations and projects, use API key authentication (Option 1).
 
 ## Usage
 
