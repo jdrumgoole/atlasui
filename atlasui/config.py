@@ -5,7 +5,11 @@ Configuration management for AtlasUI using Pydantic Settings.
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 from pathlib import Path
-import tomllib
+
+try:
+    import tomllib  # Python 3.11+
+except ModuleNotFoundError:
+    import tomli as tomllib  # Python 3.10
 
 
 def _get_version() -> str:

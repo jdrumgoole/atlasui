@@ -2,7 +2,7 @@
 
 ## Requirements
 
-* Python 3.11 or higher
+* Python 3.10 or higher
 * MongoDB Atlas account with API keys
 
 ## Installation Steps
