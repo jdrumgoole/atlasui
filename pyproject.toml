@@ -1,9 +1,9 @@
 [project]
 name = "atlasui"
-version = "0.1.0"
+version = "0.1.1"
 description = "User Interface for MongoDB Atlas - Web UI and CLI tool"
 authors = [
-    {name = "MongoDB Atlas UI Team"}
+    {name = "Independent Developer"}
 ]
 requires-python = ">=3.11"
 dependencies = [
