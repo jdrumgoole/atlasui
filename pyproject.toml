@@ -1,9 +1,10 @@
 [project]
 name = "atlasui"
-version = "0.1.1"
+version = "0.1.2"
 description = "User Interface for MongoDB Atlas - Web UI and CLI tool"
+readme = "README.md"
 authors = [
-    {name = "Independent Developer"}
+    {name = "Joe Drumgoole"}
 ]
 requires-python = ">=3.11"
 dependencies = [
