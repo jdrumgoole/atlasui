@@ -64,7 +64,7 @@ ATLAS_AUTH_METHOD=service_account
 ATLAS_SERVICE_ACCOUNT_CREDENTIALS_FILE=/path/to/service-account.json
 ```
 
-See the [Service Account Documentation](docs/service_accounts.rst) for detailed instructions.
+See the [Service Account Documentation](docs/service_accounts.md) for detailed instructions.
 
 ### Option 2: API Key Authentication (Legacy)
 
