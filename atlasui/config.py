@@ -100,3 +100,19 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+
+def reload_settings() -> Settings:
+    """
+    Reload settings from environment and .env file.
+
+    This is useful when the .env file is updated at runtime (e.g., via web configuration).
+
+    Returns:
+        New Settings instance with reloaded values
+    """
+    global settings
+    # Force Pydantic to reload by creating a new instance
+    # This will re-read the .env file
+    settings = Settings()
+    return settings

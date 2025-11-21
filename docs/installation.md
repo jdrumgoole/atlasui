@@ -64,7 +64,7 @@ Verify your installation:
 atlasui --help
 
 # Start web server
-atlasui-server
+atlasui start
 ```
 
 The web interface will be available at http://localhost:8000

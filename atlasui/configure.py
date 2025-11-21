@@ -145,17 +145,18 @@ def configure_api_key() -> int:
     instructions = Panel.fit(
         """[bold]To get your Atlas API keys:[/bold]
 
-1. Go to: [bold]https://cloud.mongodb.com[/bold]
-2. Click your organization name → [bold]Access Manager[/bold]
-3. Click [bold]API Keys[/bold] tab
-4. Click [bold]Create API Key[/bold]
-5. Enter a description (e.g., "AtlasUI Access")
-6. Set permissions: [bold]Organization Owner[/bold] or [bold]Organization Project Creator[/bold]
-7. Click [bold]Next[/bold]
-8. Copy the [bold]Public Key[/bold] and [bold]Private Key[/bold]
+1. Go to: [bold]https://cloud.mongodb.com/v2#/preferences/organizations[/bold]
+2. Select your organization from the list
+3. In the sidebar, click [bold]Applications[/bold]
+4. Choose [bold]API Key[/bold] (not Service Account)
+5. Click [bold]Create API Key[/bold]
+6. Enter a description (e.g., "AtlasUI Access")
+7. Set permissions: [bold]Organization Owner[/bold] or [bold]Organization Project Creator[/bold]
+8. Click [bold]Next[/bold]
+9. Copy the [bold]Public Key[/bold] and [bold]Private Key[/bold]
    [yellow]⚠️  The Private Key is only shown once![/yellow]
-9. Add your IP address to the API Key whitelist
-10. Click [bold]Done[/bold]
+10. Add your IP address to the API Key whitelist
+11. Click [bold]Done[/bold]
         """,
         title="📋 Getting API Keys",
         border_style="cyan"
@@ -352,7 +353,7 @@ def print_api_key_next_steps(connection_ok: bool):
 [bold cyan]Next Steps:[/bold cyan]
 
 1. Start the web server:
-   [bold]atlasui-server[/bold]
+   [bold]atlasui start[/bold]
    Then visit: http://localhost:8000
 
 2. Use the CLI:
@@ -385,7 +386,7 @@ However, the connection test failed. Please:
 3. Verify your IP is whitelisted for the API key
 
 4. Test manually:
-   [bold]atlasui-server[/bold]
+   [bold]atlasui start[/bold]
             """,
             title="⚠ Action Required",
             border_style="yellow"

@@ -8,13 +8,13 @@ This guide will help you get started with AtlasUI quickly.
 
 ```bash
 # Start the web server
-atlasui-server
+atlasui start
 
 # Or with custom port
-uvicorn atlasui.server:app --port 8080
+atlasui start --port 8080
 
-# With auto-reload for development
-uvicorn atlasui.server:app --reload
+# Or use the PORT environment variable
+PORT=8080 atlasui start
 ```
 
 Then open your browser to http://localhost:8000

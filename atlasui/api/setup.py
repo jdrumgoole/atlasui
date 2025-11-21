@@ -149,6 +149,10 @@ async def configure_api_key(request: APIKeyConfigRequest) -> Dict[str, Any]:
         except Exception:
             pass  # Permissions may not be settable on all systems
 
+        # Reload settings to pick up the new credentials
+        from atlasui.config import reload_settings
+        reload_settings()
+
         return {
             "success": True,
             "auth_method": "api_key",
@@ -227,6 +231,10 @@ async def configure_service_account(
             env_path.chmod(0o600)
         except Exception:
             pass
+
+        # Reload settings to pick up the new credentials
+        from atlasui.config import reload_settings
+        reload_settings()
 
         return {
             "success": True,

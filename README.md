@@ -77,10 +77,12 @@ atlasui-configure
 ```
 
 **How to get API keys:**
-1. Go to https://cloud.mongodb.com
-2. Organization → Access Manager → API Keys
-3. Create API Key with Organization Owner permissions
-4. Copy Public Key and Private Key
+1. Go to https://cloud.mongodb.com/v2#/preferences/organizations
+2. Select your organization from the list
+3. In the sidebar, click **Applications**
+4. Choose **API Key** (not Service Account)
+5. Create API Key with Organization Owner permissions
+6. Copy Public Key and Private Key
 
 #### Service Accounts (Limited) ⚠️
 
@@ -104,6 +106,23 @@ atlasui-configure
 
 See [Service Account Documentation](docs/service_accounts.md) for details.
 
+### Web-Based Configuration
+
+You can also configure AtlasUI through the web interface:
+
+1. Start the server without configuration:
+   ```bash
+   atlasui start
+   ```
+
+2. Open http://localhost:8000 in your browser
+
+3. The setup wizard will guide you through configuration
+
+4. Enter your API keys and test the connection
+
+5. Settings are automatically saved and reloaded
+
 ### Manual Configuration
 
 If you prefer to configure manually:
@@ -126,7 +145,7 @@ ATLAS_PRIVATE_KEY=your_private_key
 Start the web server:
 
 ```bash
-atlasui-server
+atlasui start
 ```
 
 Then open your browser to http://localhost:8000
@@ -134,11 +153,14 @@ Then open your browser to http://localhost:8000
 The server can also be started with custom options:
 
 ```bash
-# Custom host and port
-uvicorn atlasui.server:app --host 0.0.0.0 --port 8080
+# Custom port
+atlasui start --port 8080
 
-# With auto-reload for development
-uvicorn atlasui.server:app --reload
+# Or use environment variable
+PORT=8080 atlasui start
+
+# Stop the server
+atlasui stop
 ```
 
 ### CLI Tool
