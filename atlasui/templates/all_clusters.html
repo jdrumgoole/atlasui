@@ -7,9 +7,14 @@
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-2">
             <h1><i class="bi bi-hdd-rack"></i> All Clusters</h1>
-            <button class="btn btn-outline-success btn-sm" id="refreshBtn">
-                <i class="bi bi-arrow-clockwise"></i> Refresh
-            </button>
+            <div>
+                <button class="btn btn-success btn-sm me-2" id="createClusterBtn">
+                    <i class="bi bi-plus-circle"></i> Create Cluster
+                </button>
+                <button class="btn btn-outline-success btn-sm" id="refreshBtn">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
         </div>
 
         <!-- Loading indicator -->
@@ -32,9 +37,9 @@
                 <table class="table table-striped table-hover">
                     <thead>
                         <tr>
+                            <th>Name</th>
                             <th>Organization</th>
                             <th>Project</th>
-                            <th>Name</th>
                             <th>Status</th>
                             <th>Type</th>
                             <th>MongoDB</th>
@@ -204,6 +209,174 @@
         </div>
     </div>
 </div>
+
+<!-- Create Cluster Modal -->
+<div class="modal fade" id="createClusterModal" tabindex="-1" aria-labelledby="createClusterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createClusterModalLabel">
+                    <i class="bi bi-plus-circle"></i> Create New Cluster
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="createClusterError" class="alert alert-danger d-none"></div>
+                <div id="createClusterSuccess" class="alert alert-success d-none"></div>
+
+                <form id="createClusterForm">
+                    <div class="mb-3">
+                        <label for="createClusterProjectId" class="form-label">Project <span class="text-danger">*</span></label>
+                        <select class="form-select" id="createClusterProjectId" required>
+                            <option value="">Select project...</option>
+                        </select>
+                        <div class="form-text">Select the project where this cluster will be created</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="clusterNameInput" class="form-label">Cluster Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="clusterNameInput" required
+                               placeholder="e.g., my-cluster">
+                        <div class="form-text">Must be unique within the project. Lowercase alphanumeric and hyphens only.</div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="providerName" class="form-label">Cloud Provider <span class="text-danger">*</span></label>
+                                <select class="form-select" id="providerName" required>
+                                    <option value="">Select provider...</option>
+                                    <option value="AWS">Amazon Web Services (AWS)</option>
+                                    <option value="GCP">Google Cloud Platform (GCP)</option>
+                                    <option value="AZURE">Microsoft Azure</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="regionName" class="form-label">Region <span class="text-danger">*</span></label>
+                                <select class="form-select" id="regionName" required disabled>
+                                    <option value="">Select region...</option>
+                                </select>
+                                <div class="form-text">Region availability depends on provider</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="instanceSize" class="form-label">Instance Size <span class="text-danger">*</span></label>
+                                <select class="form-select" id="instanceSize" required>
+                                    <option value="">Select size...</option>
+                                    <optgroup label="Free Tier">
+                                        <option value="M0">M0 - Free (512MB storage, shared CPU)</option>
+                                    </optgroup>
+                                    <optgroup label="Serverless">
+                                        <option value="SERVERLESS">Serverless - Pay-per-use (auto-scaling)</option>
+                                    </optgroup>
+                                    <optgroup label="Dedicated Clusters">
+                                        <option value="M10">M10 - 2GB RAM</option>
+                                        <option value="M20">M20 - 4GB RAM</option>
+                                        <option value="M30">M30 - 8GB RAM</option>
+                                        <option value="M40">M40 - 16GB RAM</option>
+                                        <option value="M50">M50 - 32GB RAM</option>
+                                        <option value="M60">M60 - 64GB RAM</option>
+                                        <option value="M80">M80 - 128GB RAM</option>
+                                        <option value="M140">M140 - 192GB RAM</option>
+                                        <option value="M200">M200 - 256GB RAM</option>
+                                        <option value="M300">M300 - 384GB RAM</option>
+                                    </optgroup>
+                                </select>
+                                <div class="form-text">M0 is free tier. Serverless auto-scales. M10+ are dedicated clusters with fixed resources.</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="mongoDBVersion" class="form-label">MongoDB Version</label>
+                                <select class="form-select" id="mongoDBVersion">
+                                    <option value="">Latest version</option>
+                                    <option value="8.0">8.0</option>
+                                    <option value="7.0">7.0</option>
+                                    <option value="6.0">6.0</option>
+                                    <option value="5.0">5.0</option>
+                                </select>
+                                <div class="form-text">Leave blank for latest stable version</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="clusterType" class="form-label">Cluster Type <span class="text-danger">*</span></label>
+                        <select class="form-select" id="clusterType" required>
+                            <option value="REPLICASET">Replica Set (Recommended)</option>
+                            <option value="SHARDED">Sharded Cluster</option>
+                        </select>
+                        <div class="form-text">Replica Set is recommended for most use cases</div>
+                    </div>
+
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="enableBackup">
+                        <label class="form-check-label" for="enableBackup">
+                            Enable Cloud Backup (Recommended)
+                        </label>
+                    </div>
+
+                    <div class="alert alert-info small">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Note:</strong> Creating a cluster may take several minutes. M0 (Free Tier) clusters have usage limitations.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="submitCreateClusterBtn">
+                    <i class="bi bi-plus-circle"></i> Create Cluster
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Cluster Confirmation Modal -->
+<div class="modal fade" id="deleteClusterModal" tabindex="-1" aria-labelledby="deleteClusterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteClusterModalLabel">
+                    <i class="bi bi-exclamation-triangle-fill"></i> Confirm Cluster Deletion
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-warning">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <strong>Warning:</strong> This action cannot be undone!
+                </div>
+                <p>You are about to permanently delete the cluster:</p>
+                <p class="text-center"><strong id="deleteClusterName"></strong></p>
+                <p class="text-danger"><strong>All data in this cluster will be lost permanently.</strong></p>
+                <p class="text-muted small">Please ensure you have backups of any important data before proceeding.</p>
+
+                <div class="mb-3 mt-3">
+                    <label for="confirmClusterName" class="form-label">
+                        Type the cluster name to confirm deletion:
+                    </label>
+                    <input type="text" class="form-control" id="confirmClusterName"
+                           placeholder="Enter cluster name">
+                </div>
+
+                <div id="deleteClusterError" class="alert alert-danger d-none mt-3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteClusterBtn" disabled>
+                    <i class="bi bi-trash"></i> Delete Cluster
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -225,6 +398,58 @@
 
     .cluster-name-link:hover {
         text-decoration: underline;
+    }
+
+    /* Cluster creation animations */
+    .cluster-creation-animation {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    @keyframes pulse {
+        0%, 100% {
+            transform: scale(1);
+            opacity: 1;
+        }
+        50% {
+            transform: scale(1.1);
+            opacity: 0.8;
+        }
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
+        }
+        100% {
+            transform: rotate(360deg);
+        }
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .pulse-icon {
+        animation: pulse 2s ease-in-out infinite;
+        display: inline-block;
+    }
+
+    .spinning-gear {
+        animation: spin 2s linear infinite;
+        display: inline-block;
+    }
+
+    .fade-in {
+        animation: fadeIn 0.5s ease-in;
     }
 </style>
 
@@ -320,6 +545,11 @@ function renderClusters() {
 
         row.innerHTML = `
             <td>
+                <a href="javascript:void(0)" class="cluster-name-link" onclick="showClusterDetails('${cluster.id || cluster.name}')">
+                    <strong>${cluster.name}</strong>
+                </a>
+            </td>
+            <td>
                 <a href="/organizations/${encodeURIComponent(cluster.orgName)}/projects" class="text-decoration-none">
                     <i class="bi bi-building"></i> ${cluster.orgName}
                 </a>
@@ -327,11 +557,6 @@ function renderClusters() {
             <td>
                 <a href="/projects/${encodeURIComponent(cluster.projectName)}" class="text-decoration-none">
                     <i class="bi bi-folder"></i> ${cluster.projectName}
-                </a>
-            </td>
-            <td>
-                <a href="javascript:void(0)" class="cluster-name-link" onclick="showClusterDetails('${cluster.id || cluster.name}')">
-                    <strong>${cluster.name}</strong>
                 </a>
             </td>
             <td><span class="badge ${statusClass}">${cluster.stateName || 'UNKNOWN'}</span></td>
@@ -346,10 +571,14 @@ function renderClusters() {
             <td>${cluster.providerSettings?.instanceSizeName || 'N/A'}</td>
             <td><span class="badge bg-secondary">${users.length}</span></td>
             <td>
-                <button class="btn btn-sm btn-outline-primary cluster-login-btn"
+                <button class="btn btn-sm btn-outline-primary cluster-login-btn me-1"
                         data-cluster="${cluster.name}"
                         onclick="handleClusterAction('${cluster.name}')">
                     <i class="bi bi-box-arrow-in-right"></i> Login
+                </button>
+                <button class="btn btn-sm btn-outline-danger"
+                        onclick="showDeleteClusterConfirmation('${cluster.name}', '${cluster.projectId}')">
+                    <i class="bi bi-trash"></i> Delete
                 </button>
             </td>
         `;
@@ -386,14 +615,41 @@ function getStatusBadgeClass(status) {
     }
 }
 
-function showClusterDetails(clusterId) {
+async function showClusterDetails(clusterId) {
     // Find cluster in the clusters array
     const cluster = clusters.find(c => (c.id === clusterId || c.name === clusterId));
     if (!cluster) return;
 
     const detailsContent = document.getElementById('detailsContent');
-    const statusClass = getStatusBadgeClass(cluster.stateName);
-    const users = cluster.users || [];
+
+    // Show loading state
+    detailsContent.innerHTML = `
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading cluster details...</p>
+        </div>
+    `;
+
+    // Open the offcanvas immediately
+    const offcanvas = new bootstrap.Offcanvas(document.getElementById('detailsPanel'));
+    offcanvas.show();
+
+    try {
+        // Fetch additional data in parallel
+        const [alertsData, snapshotsData, advancedConfigData, usersData] = await Promise.all([
+            fetch(`/api/alerts/${cluster.projectId}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+            fetch(`/api/backups/${cluster.projectId}/${cluster.name}/snapshots`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+            fetch(`/api/clusters/${cluster.projectId}/${cluster.name}/advanced-configuration`).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+            fetch(`/api/users/${cluster.projectId}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] }))
+        ]);
+
+        const alerts = (alertsData.results || []).filter(alert => alert.clusterName === cluster.name);
+        const snapshots = snapshotsData.results || [];
+        const advancedConfig = advancedConfigData;
+        const users = usersData.results || [];
+        const statusClass = getStatusBadgeClass(cluster.stateName);
 
     // Build comprehensive details HTML
     let html = `
@@ -403,37 +659,15 @@ function showClusterDetails(clusterId) {
 
         <div class="mb-3">
             <span class="badge ${statusClass}">${cluster.stateName || 'UNKNOWN'}</span>
-        </div>
-
-        <div class="mb-3">
-            <h6 class="text-muted">Organization & Project</h6>
-            <table class="table table-sm">
-                <tbody>
-                    <tr>
-                        <th>Organization</th>
-                        <td>
-                            <a href="/organizations/${encodeURIComponent(cluster.orgName)}/projects">
-                                ${cluster.orgName}
-                            </a>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th>Project</th>
-                        <td>
-                            <a href="/projects/${encodeURIComponent(cluster.projectName)}">
-                                ${cluster.projectName}
-                            </a>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            ${cluster.paused ? '<span class="badge bg-warning text-dark ms-1">PAUSED</span>' : ''}
+            ${alerts.length > 0 ? `<span class="badge bg-danger ms-1">${alerts.length} Alert${alerts.length > 1 ? 's' : ''}</span>` : ''}
         </div>
 
         <div class="mb-3">
             <h6 class="text-muted">Basic Information</h6>
             <table class="table table-sm">
                 <tbody>
-                    <tr><th>Name</th><td>${cluster.name}</td></tr>
+                    <tr><th width="40%">Name</th><td>${cluster.name}</td></tr>
                     ${cluster.id ? `<tr><th>ID</th><td><code class="small">${cluster.id}</code></td></tr>` : ''}
                     ${cluster.groupId ? `<tr><th>Group ID</th><td><code class="small">${cluster.groupId}</code></td></tr>` : ''}
                     <tr><th>Status</th><td><span class="badge ${statusClass}">${cluster.stateName || 'UNKNOWN'}</span></td></tr>
@@ -444,10 +678,11 @@ function showClusterDetails(clusterId) {
                     ${cluster.replicationFactor ? `<tr><th>Replication Factor</th><td>${cluster.replicationFactor}</td></tr>` : ''}
                     ${cluster.numShards ? `<tr><th>Number of Shards</th><td>${cluster.numShards}</td></tr>` : ''}
                     ${cluster.diskSizeGB ? `<tr><th>Disk Size</th><td>${cluster.diskSizeGB} GB</td></tr>` : ''}
-                    ${cluster.paused !== undefined ? `<tr><th>Paused</th><td>${cluster.paused ? 'Yes' : 'No'}</td></tr>` : ''}
-                    ${cluster.backupEnabled !== undefined ? `<tr><th>Backup Enabled</th><td>${cluster.backupEnabled ? 'Yes' : 'No'}</td></tr>` : ''}
-                    ${cluster.providerBackupEnabled !== undefined ? `<tr><th>Provider Backup</th><td>${cluster.providerBackupEnabled ? 'Yes' : 'No'}</td></tr>` : ''}
-                    ${cluster.pitEnabled !== undefined ? `<tr><th>Point-in-Time Restore</th><td>${cluster.pitEnabled ? 'Enabled' : 'Disabled'}</td></tr>` : ''}
+                    ${cluster.paused !== undefined ? `<tr><th>Paused</th><td><span class="badge ${cluster.paused ? 'bg-warning' : 'bg-success'}">${cluster.paused ? 'Yes' : 'No'}</span></td></tr>` : ''}
+                    ${cluster.backupEnabled !== undefined ? `<tr><th>Backup Enabled</th><td><span class="badge ${cluster.backupEnabled ? 'bg-success' : 'bg-secondary'}">${cluster.backupEnabled ? 'Yes' : 'No'}</span></td></tr>` : ''}
+                    ${cluster.providerBackupEnabled !== undefined ? `<tr><th>Provider Backup</th><td><span class="badge ${cluster.providerBackupEnabled ? 'bg-success' : 'bg-secondary'}">${cluster.providerBackupEnabled ? 'Yes' : 'No'}</span></td></tr>` : ''}
+                    ${cluster.pitEnabled !== undefined ? `<tr><th>Point-in-Time Restore</th><td><span class="badge ${cluster.pitEnabled ? 'bg-success' : 'bg-secondary'}">${cluster.pitEnabled ? 'Enabled' : 'Disabled'}</span></td></tr>` : ''}
+                    ${snapshots.length > 0 ? `<tr><th>Snapshots</th><td><span class="badge bg-info">${snapshots.length}</span></td></tr>` : ''}
                     ${cluster.encryptionAtRestProvider ? `<tr><th>Encryption Provider</th><td>${cluster.encryptionAtRestProvider}</td></tr>` : ''}
                     ${cluster.versionReleaseSystem ? `<tr><th>Version Release System</th><td>${cluster.versionReleaseSystem}</td></tr>` : ''}
                     ${cluster.rootCertType ? `<tr><th>Root Cert Type</th><td>${cluster.rootCertType}</td></tr>` : ''}
@@ -463,14 +698,13 @@ function showClusterDetails(clusterId) {
                 <h6 class="text-muted">Provider Settings</h6>
                 <table class="table table-sm">
                     <tbody>
-                        ${cluster.providerSettings.providerName ? `<tr><th>Provider</th><td>${cluster.providerSettings.providerName}</td></tr>` : ''}
+                        ${cluster.providerSettings.providerName ? `<tr><th width="40%">Provider</th><td>${cluster.providerSettings.providerName}</td></tr>` : ''}
                         ${cluster.providerSettings.regionName ? `<tr><th>Region</th><td>${cluster.providerSettings.regionName}</td></tr>` : ''}
                         ${cluster.providerSettings.instanceSizeName ? `<tr><th>Instance Size</th><td>${cluster.providerSettings.instanceSizeName}</td></tr>` : ''}
                         ${cluster.providerSettings.backingProviderName ? `<tr><th>Backing Provider</th><td>${cluster.providerSettings.backingProviderName}</td></tr>` : ''}
                         ${cluster.providerSettings.diskIOPS ? `<tr><th>Disk IOPS</th><td>${cluster.providerSettings.diskIOPS}</td></tr>` : ''}
-                        ${cluster.providerSettings.encryptEBSVolume !== undefined ? `<tr><th>Encrypted EBS</th><td>${cluster.providerSettings.encryptEBSVolume ? 'Yes' : 'No'}</td></tr>` : ''}
+                        ${cluster.providerSettings.encryptEBSVolume !== undefined ? `<tr><th>Encrypted EBS</th><td><span class="badge ${cluster.providerSettings.encryptEBSVolume ? 'bg-success' : 'bg-secondary'}">${cluster.providerSettings.encryptEBSVolume ? 'Yes' : 'No'}</span></td></tr>` : ''}
                         ${cluster.providerSettings.volumeType ? `<tr><th>Volume Type</th><td>${cluster.providerSettings.volumeType}</td></tr>` : ''}
-                        ${cluster.providerSettings.autoScaling ? `<tr><th>Auto Scaling</th><td>Configured</td></tr>` : ''}
                     </tbody>
                 </table>
             </div>
@@ -583,11 +817,17 @@ function showClusterDetails(clusterId) {
         `;
     }
 
-    detailsContent.innerHTML = html;
+        detailsContent.innerHTML = html;
 
-    // Open the offcanvas
-    const offcanvas = new bootstrap.Offcanvas(document.getElementById('detailsPanel'));
-    offcanvas.show();
+    } catch (err) {
+        console.error('Error loading cluster details:', err);
+        detailsContent.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                Failed to load cluster details: ${err.message}
+            </div>
+        `;
+    }
 }
 
 function showLoginModal(connectionString, clusterName) {
@@ -869,11 +1109,451 @@ async function checkSessionStatus() {
     }
 }
 
+// Region data by cloud provider
+const regionsByProvider = {
+    'AWS': [
+        { value: 'US_EAST_1', label: 'US East (N. Virginia)' },
+        { value: 'US_EAST_2', label: 'US East (Ohio)' },
+        { value: 'US_WEST_1', label: 'US West (N. California)' },
+        { value: 'US_WEST_2', label: 'US West (Oregon)' },
+        { value: 'CA_CENTRAL_1', label: 'Canada (Central)' },
+        { value: 'EU_WEST_1', label: 'EU (Ireland)' },
+        { value: 'EU_WEST_2', label: 'EU (London)' },
+        { value: 'EU_CENTRAL_1', label: 'EU (Frankfurt)' },
+        { value: 'EU_NORTH_1', label: 'EU (Stockholm)' },
+        { value: 'AP_SOUTH_1', label: 'Asia Pacific (Mumbai)' },
+        { value: 'AP_SOUTHEAST_1', label: 'Asia Pacific (Singapore)' },
+        { value: 'AP_SOUTHEAST_2', label: 'Asia Pacific (Sydney)' },
+        { value: 'AP_NORTHEAST_1', label: 'Asia Pacific (Tokyo)' },
+        { value: 'SA_EAST_1', label: 'South America (São Paulo)' }
+    ],
+    'GCP': [
+        { value: 'CENTRAL_US', label: 'Iowa (us-central1)' },
+        { value: 'EASTERN_US', label: 'South Carolina (us-east4)' },
+        { value: 'WESTERN_US', label: 'Oregon (us-west1)' },
+        { value: 'WESTERN_EUROPE', label: 'Belgium (europe-west1)' },
+        { value: 'EASTERN_ASIA_PACIFIC', label: 'Taiwan (asia-east1)' },
+        { value: 'NORTHEASTERN_ASIA_PACIFIC', label: 'Tokyo (asia-northeast1)' },
+        { value: 'SOUTHEASTERN_ASIA_PACIFIC', label: 'Singapore (asia-southeast1)' },
+        { value: 'AUSTRALIA_SOUTHEAST_1', label: 'Sydney (australia-southeast1)' }
+    ],
+    'AZURE': [
+        { value: 'EAST_US_2', label: 'East US 2 (Virginia)' },
+        { value: 'WEST_US_2', label: 'West US 2 (Washington)' },
+        { value: 'CENTRAL_US', label: 'Central US (Iowa)' },
+        { value: 'NORTH_EUROPE', label: 'North Europe (Ireland)' },
+        { value: 'WEST_EUROPE', label: 'West Europe (Netherlands)' },
+        { value: 'EAST_ASIA', label: 'East Asia (Hong Kong)' },
+        { value: 'SOUTHEAST_ASIA', label: 'Southeast Asia (Singapore)' },
+        { value: 'AUSTRALIA_EAST', label: 'Australia East (Sydney)' },
+        { value: 'UK_SOUTH', label: 'UK South (London)' }
+    ]
+};
+
+function updateRegionOptions(provider) {
+    const regionSelect = document.getElementById('regionName');
+    regionSelect.innerHTML = '<option value="">Select region...</option>';
+    const regions = regionsByProvider[provider] || [];
+    regions.forEach(region => {
+        const option = document.createElement('option');
+        option.value = region.value;
+        option.textContent = region.label;
+        regionSelect.appendChild(option);
+    });
+    regionSelect.disabled = !provider;
+}
+
+// Create Cluster functionality
+async function showCreateClusterModal() {
+    // Load all projects for the dropdown
+    const projectSelect = document.getElementById('createClusterProjectId');
+    projectSelect.innerHTML = '<option value="">Loading projects...</option>';
+
+    try {
+        // Fetch all organizations
+        const orgsResponse = await fetch('/api/organizations/?itemsPerPage=500');
+        if (!orgsResponse.ok) throw new Error('Failed to fetch organizations');
+        const orgsData = await orgsResponse.json();
+
+        // Fetch all projects for each organization
+        const allProjects = [];
+        for (let org of orgsData.results || []) {
+            const projectsResponse = await fetch(`/api/organizations/${org.id}/projects?itemsPerPage=500`);
+            if (projectsResponse.ok) {
+                const projectsData = await projectsResponse.json();
+                (projectsData.results || []).forEach(project => {
+                    allProjects.push({
+                        id: project.id,
+                        name: project.name,
+                        orgName: org.name
+                    });
+                });
+            }
+        }
+
+        // Populate project dropdown
+        projectSelect.innerHTML = '<option value="">Select project...</option>';
+        allProjects.forEach(project => {
+            const option = document.createElement('option');
+            option.value = project.id;
+            option.textContent = `${project.name} (${project.orgName})`;
+            projectSelect.appendChild(option);
+        });
+
+    } catch (err) {
+        console.error('Error loading projects:', err);
+        projectSelect.innerHTML = '<option value="">Error loading projects</option>';
+    }
+
+    // Reset form and messages
+    document.getElementById('createClusterForm').reset();
+    document.getElementById('createClusterError').classList.add('d-none');
+    document.getElementById('createClusterSuccess').classList.add('d-none');
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('createClusterModal'));
+    modal.show();
+}
+
+async function createCluster() {
+    const errorDiv = document.getElementById('createClusterError');
+
+    // Get form values
+    const projectId = document.getElementById('createClusterProjectId').value;
+    const clusterName = document.getElementById('clusterNameInput').value.trim();
+    const providerName = document.getElementById('providerName').value;
+    const regionName = document.getElementById('regionName').value;
+    const instanceSize = document.getElementById('instanceSize').value;
+    const mongoDBVersion = document.getElementById('mongoDBVersion').value;
+    const clusterType = document.getElementById('clusterType').value;
+    const enableBackup = document.getElementById('enableBackup').checked;
+
+    // Validate
+    if (!projectId || !clusterName || !providerName || !regionName || !instanceSize || !clusterType) {
+        errorDiv.textContent = 'Please fill in all required fields';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+
+    // Build cluster configuration based on instance type
+    let clusterConfig;
+
+    if (instanceSize === 'SERVERLESS') {
+        clusterConfig = {
+            name: clusterName,
+            providerSettings: {
+                providerName: "SERVERLESS"
+            },
+            serverlessSpec: {
+                providerSettings: {
+                    providerName: providerName,
+                    regionName: regionName
+                }
+            }
+        };
+    } else if (instanceSize === 'M0') {
+        clusterConfig = {
+            name: clusterName,
+            clusterType: clusterType,
+            providerSettings: {
+                providerName: "TENANT",
+                backingProviderName: providerName,
+                regionName: regionName,
+                instanceSizeName: instanceSize
+            },
+            mongoDBMajorVersion: mongoDBVersion || "7.0",
+            numShards: 1,
+            replicationFactor: 3,
+            diskSizeGB: 0.5
+        };
+    } else {
+        clusterConfig = {
+            name: clusterName,
+            clusterType: clusterType,
+            providerSettings: {
+                providerName: providerName,
+                regionName: regionName,
+                instanceSizeName: instanceSize
+            }
+        };
+
+        if (enableBackup) {
+            clusterConfig.providerBackupEnabled = true;
+        }
+    }
+
+    if (mongoDBVersion && instanceSize !== 'SERVERLESS') {
+        clusterConfig.mongoDBMajorVersion = mongoDBVersion;
+    }
+
+    // Close the modal immediately
+    bootstrap.Modal.getInstance(document.getElementById('createClusterModal')).hide();
+
+    // Queue the creation operation
+    window.operationQueue.enqueue({
+        type: 'create_cluster',
+        name: `Create Cluster: ${clusterName} (${instanceSize})`,
+        metadata: {
+            clusterName: clusterName,
+            projectId: projectId,
+            instanceSize: instanceSize,
+            provider: providerName,
+            region: regionName
+        },
+        execute: async (updateProgress) => {
+            try {
+                updateProgress('Submitting cluster creation request...');
+                console.log('Creating cluster with config:', JSON.stringify(clusterConfig, null, 2));
+
+                const response = await fetch(`/api/clusters/${projectId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(clusterConfig)
+                });
+
+                if (!response.ok) {
+                    let errorMessage = `Failed to create cluster (${response.status})`;
+                    try {
+                        const errorData = await response.json();
+                        console.error('Cluster creation error:', errorData);
+                        if (errorData.detail) {
+                            errorMessage = errorData.detail;
+                        } else if (errorData.error) {
+                            errorMessage = errorData.error;
+                        } else if (errorData.message) {
+                            errorMessage = errorData.message;
+                        }
+                    } catch (e) {
+                        console.error('Error parsing error response:', e);
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                const newCluster = await response.json();
+                updateProgress('Cluster creation initiated successfully');
+
+                // Reload clusters list
+                loadClusters();
+
+                return { success: true, clusterName: clusterName };
+
+            } catch (err) {
+                console.error('Error creating cluster:', err);
+                throw err;
+            }
+        }
+    });
+}
+
+async function pollClusterCreationStatus(projectId, clusterName) {
+    const maxAttempts = 60;
+    let attempts = 0;
+
+    const pollInterval = setInterval(async () => {
+        attempts++;
+
+        try {
+            const response = await fetch(`/api/clusters/${projectId}`);
+            if (!response.ok) throw new Error('Failed to fetch cluster status');
+
+            const data = await response.json();
+            const cluster = (data.results || []).find(c => c.name === clusterName);
+
+            if (!cluster) {
+                clearInterval(pollInterval);
+                return;
+            }
+
+            const progressBar = document.getElementById('clusterCreationProgress');
+            const progressPercent = Math.min(10 + (attempts * 1.5), 95);
+            if (progressBar) {
+                progressBar.style.width = `${progressPercent}%`;
+                if (progressPercent < 30) {
+                    progressBar.innerHTML = '<span class="fw-bold">Setting up...</span>';
+                } else if (progressPercent < 60) {
+                    progressBar.innerHTML = '<span class="fw-bold">Provisioning...</span>';
+                } else if (progressPercent < 90) {
+                    progressBar.innerHTML = '<span class="fw-bold">Configuring...</span>';
+                } else {
+                    progressBar.innerHTML = '<span class="fw-bold">Almost ready...</span>';
+                }
+            }
+
+            if (attempts > 5) {
+                const step1 = document.getElementById('step-provisioning');
+                if (step1) step1.innerHTML = '<i class="bi bi-arrow-right-circle-fill text-primary"></i> Provisioning resources';
+            }
+            if (attempts > 15) {
+                const step2 = document.getElementById('step-configuring');
+                if (step2) step2.innerHTML = '<i class="bi bi-arrow-right-circle-fill text-primary"></i> Configuring MongoDB';
+            }
+            if (attempts > 30) {
+                const step3 = document.getElementById('step-ready');
+                if (step3) step3.innerHTML = '<i class="bi bi-arrow-right-circle-fill text-primary"></i> Finalizing deployment';
+            }
+
+            const statusBadge = document.getElementById('clusterCreationStatus');
+            if (statusBadge) {
+                statusBadge.className = 'badge fs-6 py-2 px-3';
+                switch (cluster.stateName) {
+                    case 'IDLE':
+                        statusBadge.classList.add('bg-success');
+                        statusBadge.innerHTML = '<i class="bi bi-check-circle-fill"></i> IDLE';
+                        break;
+                    case 'CREATING':
+                    case 'UPDATING':
+                        statusBadge.classList.add('bg-warning', 'text-dark');
+                        statusBadge.innerHTML = '<i class="bi bi-gear-fill spinning-gear"></i> ' + cluster.stateName;
+                        break;
+                    default:
+                        statusBadge.classList.add('bg-secondary');
+                        statusBadge.innerHTML = '<i class="bi bi-question-circle-fill"></i> ' + (cluster.stateName || 'UNKNOWN');
+                }
+            }
+
+            if (cluster.stateName === 'IDLE') {
+                clearInterval(pollInterval);
+
+                document.getElementById('step-provisioning').innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Provisioning resources';
+                document.getElementById('step-configuring').innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Configuring MongoDB';
+                document.getElementById('step-ready').innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Finalizing deployment';
+
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                    progressBar.innerHTML = '<span class="fw-bold">Complete!</span>';
+                }
+
+                const successDiv = document.getElementById('createClusterSuccess');
+                successDiv.innerHTML = `
+                    <div class="text-center">
+                        <div class="mb-3">
+                            <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
+                        </div>
+                        <h4 class="text-success mb-3">
+                            Cluster Created Successfully!
+                        </h4>
+                        <p class="mb-3">
+                            <strong>${clusterName}</strong> is now ready to use
+                        </p>
+                        <div class="mb-3">
+                            <span class="badge bg-success fs-6 py-2 px-3">
+                                <i class="bi bi-check-circle-fill"></i> IDLE
+                            </span>
+                        </div>
+                        <div class="alert alert-success mb-0">
+                            <i class="bi bi-info-circle"></i>
+                            The cluster is fully operational and ready for connections.
+                            <br>
+                            <small class="text-muted">Refreshing cluster list...</small>
+                        </div>
+                    </div>
+                `;
+
+                setTimeout(() => {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createClusterModal'));
+                    if (modal) modal.hide();
+                    loadClusters();
+                }, 3000);
+            }
+
+            if (attempts >= maxAttempts) {
+                clearInterval(pollInterval);
+                const successDiv = document.getElementById('createClusterSuccess');
+                successDiv.innerHTML = `
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    Cluster creation is taking longer than expected.
+                    <div class="mt-2">
+                        <span class="badge bg-warning">${cluster.stateName || 'UNKNOWN'}</span>
+                        <small class="d-block mt-2">The cluster is still being created. You can close this dialog and check back later.</small>
+                    </div>
+                `;
+            }
+
+        } catch (err) {
+            console.error('Error polling cluster status:', err);
+            clearInterval(pollInterval);
+        }
+
+    }, 10000);
+}
+
+// Delete Cluster functionality
+let deleteClusterData = { name: '', projectId: '' };
+
+function showDeleteClusterConfirmation(clusterName, projectId) {
+    deleteClusterData = { name: clusterName, projectId: projectId };
+
+    document.getElementById('deleteClusterName').textContent = clusterName;
+    document.getElementById('confirmClusterName').value = '';
+    document.getElementById('deleteClusterError').classList.add('d-none');
+    document.getElementById('confirmDeleteClusterBtn').disabled = true;
+
+    const modal = new bootstrap.Modal(document.getElementById('deleteClusterModal'));
+    modal.show();
+}
+
+async function deleteCluster() {
+    const errorDiv = document.getElementById('deleteClusterError');
+    const confirmInput = document.getElementById('confirmClusterName');
+
+    if (confirmInput.value !== deleteClusterData.name) {
+        errorDiv.textContent = 'Cluster name does not match. Please type the exact cluster name.';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+
+    // Capture cluster info for the queue
+    const clusterName = deleteClusterData.name;
+    const projectId = deleteClusterData.projectId;
+
+    // Close the modal immediately
+    bootstrap.Modal.getInstance(document.getElementById('deleteClusterModal')).hide();
+
+    // Queue the deletion operation
+    window.operationQueue.enqueue({
+        type: 'delete_cluster',
+        name: `Delete Cluster: ${clusterName}`,
+        metadata: {
+            clusterName: clusterName,
+            projectId: projectId
+        },
+        execute: async (updateProgress) => {
+            try {
+                updateProgress('Initiating cluster deletion...');
+                const response = await fetch(`/api/clusters/${projectId}/${clusterName}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || `Failed to delete cluster (${response.status})`);
+                }
+
+                updateProgress('Deletion initiated, cluster will be removed shortly');
+
+                // Reload clusters list
+                loadClusters();
+
+                return { success: true, clusterName: clusterName };
+
+            } catch (err) {
+                console.error('Error deleting cluster:', err);
+                throw err;
+            }
+        }
+    });
+}
+
 // Add event listeners
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('loginBtn').addEventListener('click', loginToCluster);
     document.getElementById('addUserBtn').addEventListener('click', addDatabaseUser);
     document.getElementById('confirmLogoutBtn').addEventListener('click', performLogout);
+    document.getElementById('createClusterBtn').addEventListener('click', showCreateClusterModal);
+    document.getElementById('submitCreateClusterBtn').addEventListener('click', createCluster);
+    document.getElementById('confirmDeleteClusterBtn').addEventListener('click', deleteCluster);
 
     // Check session status on page load
     checkSessionStatus();
@@ -888,6 +1568,51 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('addUserForm').addEventListener('submit', function(e) {
         e.preventDefault();
         addDatabaseUser();
+    });
+
+    // Allow Enter key to submit create cluster
+    document.getElementById('createClusterForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        createCluster();
+    });
+
+    // Provider change event for region updates
+    const providerSelect = document.getElementById('providerName');
+    if (providerSelect) {
+        providerSelect.addEventListener('change', function() {
+            updateRegionOptions(this.value);
+        });
+    }
+
+    // Cluster name confirmation for deletion
+    const confirmInput = document.getElementById('confirmClusterName');
+    const deleteBtn = document.getElementById('confirmDeleteClusterBtn');
+    if (confirmInput) {
+        confirmInput.addEventListener('input', function() {
+            if (this.value === deleteClusterData.name) {
+                deleteBtn.disabled = false;
+            } else {
+                deleteBtn.disabled = true;
+            }
+        });
+    }
+
+    // Reset modals when closed
+    const createClusterModal = document.getElementById('createClusterModal');
+    createClusterModal.addEventListener('hidden.bs.modal', function () {
+        document.getElementById('createClusterForm').reset();
+        document.getElementById('createClusterForm').style.display = 'block';
+        document.getElementById('createClusterError').classList.add('d-none');
+        document.getElementById('createClusterSuccess').classList.add('d-none');
+        document.getElementById('regionName').disabled = true;
+    });
+
+    const deleteClusterModal = document.getElementById('deleteClusterModal');
+    deleteClusterModal.addEventListener('hidden.bs.modal', function () {
+        document.getElementById('confirmClusterName').value = '';
+        document.getElementById('deleteClusterError').classList.add('d-none');
+        document.getElementById('confirmDeleteClusterBtn').disabled = true;
+        deleteClusterData = { name: '', projectId: '' };
     });
 });
 </script>

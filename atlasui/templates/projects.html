@@ -15,9 +15,14 @@
 
         <div class="d-flex justify-content-between align-items-center mb-2">
             <h1><i class="bi bi-folder"></i> Projects</h1>
-            <button class="btn btn-outline-success btn-sm" id="refreshBtn">
-                <i class="bi bi-arrow-clockwise"></i> Refresh
-            </button>
+            <div>
+                <button class="btn btn-primary btn-sm me-2" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+                    <i class="bi bi-plus-circle"></i> Create Project
+                </button>
+                <button class="btn btn-outline-success btn-sm" id="refreshBtn">
+                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                </button>
+            </div>
         </div>
 
         <script>
@@ -46,7 +51,7 @@
     </div>
 </div>
 
-<!-- Details Panel (Offcanvas) -->
+<!-- Project Details Panel (Offcanvas) -->
 <div class="offcanvas offcanvas-end offcanvas-wide" tabindex="-1" id="detailsPanel" aria-labelledby="detailsPanelLabel">
     <div class="offcanvas-header border-bottom">
         <h5 class="offcanvas-title" id="detailsPanelLabel">
@@ -57,6 +62,21 @@
     <div class="offcanvas-body">
         <div id="detailsContent">
             <p class="text-muted">Click on a project name to view its details</p>
+        </div>
+    </div>
+</div>
+
+<!-- Cluster Details Panel (Offcanvas) -->
+<div class="offcanvas offcanvas-end offcanvas-wide" tabindex="-1" id="clusterDetailsPanel" aria-labelledby="clusterDetailsPanelLabel">
+    <div class="offcanvas-header border-bottom">
+        <h5 class="offcanvas-title" id="clusterDetailsPanelLabel">
+            <i class="bi bi-info-circle"></i> Cluster Details
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+        <div id="clusterDetailsContent">
+            <p class="text-muted">Click on a cluster name to view its details</p>
         </div>
     </div>
 </div>
@@ -105,6 +125,37 @@
         </div>
     </div>
 </div>
+
+<!-- Create Project Modal -->
+<div class="modal fade" id="createProjectModal" tabindex="-1" aria-labelledby="createProjectModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createProjectModalLabel">
+                    <i class="bi bi-plus-circle"></i> Create New Project
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createProjectForm">
+                    <div class="mb-3">
+                        <label for="projectName" class="form-label">Project Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="projectName" name="projectName" required
+                               placeholder="Enter project name" maxlength="64">
+                        <div class="form-text">Choose a unique name for your project (2-64 characters)</div>
+                    </div>
+                    <div id="createProjectError" class="alert alert-danger d-none" role="alert"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="createProjectBtn" onclick="executeCreateProject()">
+                    <i class="bi bi-plus-circle"></i> Create Project
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -125,6 +176,16 @@
     }
 
     .project-name-link:hover {
+        text-decoration: underline;
+    }
+
+    .cluster-name-link {
+        cursor: pointer;
+        color: #00684a;
+        text-decoration: none;
+    }
+
+    .cluster-name-link:hover {
         text-decoration: underline;
     }
 </style>
@@ -221,7 +282,7 @@ function renderProjects() {
                 </a>
             </td>
             <td>
-                <a href="/projects/${encodeURIComponent(project.name)}" class="text-decoration-none">
+                <a href="/clusters" class="text-decoration-none">
                     <span class="badge bg-primary">${project.clusterCount || 0}</span>
                 </a>
             </td>
@@ -262,13 +323,17 @@ async function showProjectDetails(projectId) {
 
     try {
         // Fetch all related data in parallel
-        const [clustersData, usersData] = await Promise.all([
+        const [clustersData, usersData, alertsData, projectDetailsData] = await Promise.all([
             fetch(`/api/clusters/${project.id}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
-            fetch(`/api/users/${project.id}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] }))
+            fetch(`/api/users/${project.id}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+            fetch(`/api/alerts/${project.id}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+            fetch(`/api/projects/${project.id}`).then(r => r.ok ? r.json() : {}).catch(() => ({}))
         ]);
 
         const clusters = clustersData.results || [];
         const users = usersData.results || [];
+        const alerts = alertsData.results || [];
+        const projectDetails = projectDetailsData;
 
         // Build comprehensive details HTML
         let html = `
@@ -280,13 +345,30 @@ async function showProjectDetails(projectId) {
                 <h6 class="text-muted">Basic Information</h6>
                 <table class="table table-sm">
                     <tbody>
-                        <tr><th>Name</th><td>${project.name}</td></tr>
+                        <tr><th width="40%">Name</th><td>${project.name}</td></tr>
                         <tr><th>ID</th><td><code class="small">${project.id}</code></td></tr>
                         <tr><th>Organization ID</th><td><code class="small">${project.orgId}</code></td></tr>
                         <tr><th>Cluster Count</th><td>${project.clusterCount || 0}</td></tr>
                         <tr><th>Database Users</th><td>${users.length}</td></tr>
+                        <tr><th>Active Alerts</th><td><span class="badge ${alerts.length > 0 ? 'bg-warning' : 'bg-success'}">${alerts.length}</span></td></tr>
                         <tr><th>Created</th><td>${new Date(project.created).toLocaleString()}</td></tr>
-                        <tr><th>Default Alerts</th><td>${project.withDefaultAlertsSettings ? 'Enabled' : 'Disabled'}</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="mb-3">
+                <h6 class="text-muted">Project Settings</h6>
+                <table class="table table-sm">
+                    <tbody>
+                        <tr><th width="40%">Default Alerts</th><td>${project.withDefaultAlertsSettings ? '<span class="badge bg-success">Enabled</span>' : '<span class="badge bg-secondary">Disabled</span>'}</td></tr>
+                        ${projectDetails.regionUsageRestrictions ? `<tr><th>Region Restrictions</th><td>${projectDetails.regionUsageRestrictions}</td></tr>` : ''}
+                        ${projectDetails.limits ? `
+                            <tr><th>Project Limits</th><td>
+                                ${projectDetails.limits.map(limit => `
+                                    <div class="small">${limit.name}: ${limit.value}${limit.currentUsage !== undefined ? ` (used: ${limit.currentUsage})` : ''}</div>
+                                `).join('')}
+                            </td></tr>
+                        ` : ''}
                     </tbody>
                 </table>
             </div>
@@ -304,25 +386,36 @@ async function showProjectDetails(projectId) {
 
         // Add clusters section
         if (clusters.length > 0) {
+            const clusterAlerts = alerts.filter(alert => alert.clusterName);
+
             html += `
                 <div class="mb-3">
                     <h6 class="text-muted">Clusters (${clusters.length})</h6>
                     <div class="list-group list-group-flush">
-                        ${clusters.map(cluster => `
+                        ${clusters.map(cluster => {
+                            const clusterSpecificAlerts = clusterAlerts.filter(a => a.clusterName === cluster.name);
+                            // Store cluster data for sidebar access
+                            cluster.projectId = project.id;
+                            cluster.projectName = project.name;
+                            return `
                             <div class="list-group-item py-2 px-2">
                                 <div class="d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <strong><i class="bi bi-hdd-rack"></i> ${cluster.name}</strong>
-                                        <div class="small text-muted">
-                                            ${cluster.clusterType || 'N/A'} •
-                                            ${cluster.mongoDBVersion || 'N/A'} •
-                                            ${cluster.providerSettings?.providerName || 'N/A'}
+                                    <div class="flex-grow-1">
+                                        <a href="javascript:void(0)" class="cluster-name-link" onclick="showClusterDetails('${cluster.id || cluster.name}', '${project.id}')">
+                                            <strong><i class="bi bi-hdd-rack"></i> ${cluster.name}</strong>
+                                        </a>
+                                        ${cluster.paused ? '<span class="badge bg-warning text-dark ms-2">PAUSED</span>' : ''}
+                                        ${clusterSpecificAlerts.length > 0 ? `<span class="badge bg-danger ms-1">${clusterSpecificAlerts.length} Alert${clusterSpecificAlerts.length > 1 ? 's' : ''}</span>` : ''}
+                                        <div class="small text-muted mt-1">
+                                            ${cluster.clusterType || 'N/A'} • ${cluster.mongoDBVersion || 'N/A'} • ${cluster.providerSettings?.instanceSizeName || 'N/A'}
                                         </div>
                                     </div>
-                                    <span class="badge ${getStatusBadgeClass(cluster.stateName)}">${cluster.stateName || 'UNKNOWN'}</span>
+                                    <div class="text-end">
+                                        <span class="badge ${getStatusBadgeClass(cluster.stateName)}">${cluster.stateName || 'UNKNOWN'}</span>
+                                    </div>
                                 </div>
                             </div>
-                        `).join('')}
+                        `}).join('')}
                     </div>
                 </div>
             `;
@@ -376,6 +469,46 @@ async function showProjectDetails(projectId) {
             `;
         }
 
+        // Add alerts section
+        if (alerts.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Active Alerts (${alerts.length})</h6>
+                    <div class="list-group list-group-flush">
+                        ${alerts.slice(0, 10).map(alert => `
+                            <div class="list-group-item py-2 px-2">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+                                            <strong>${alert.typeName || alert.eventTypeName || 'Alert'}</strong>
+                                        </div>
+                                        <div class="small text-muted mt-1">
+                                            ${alert.clusterName ? `Cluster: ${alert.clusterName}` : 'Project-level'}
+                                            ${alert.metricName ? ` • ${alert.metricName}` : ''}
+                                        </div>
+                                        ${alert.currentValue ? `<div class="small">Current: ${JSON.stringify(alert.currentValue)}</div>` : ''}
+                                        <div class="small text-muted">
+                                            ${alert.created ? new Date(alert.created).toLocaleString() : ''}
+                                        </div>
+                                    </div>
+                                    <span class="badge ${alert.status === 'OPEN' ? 'bg-warning' : 'bg-secondary'} ms-2">${alert.status || 'OPEN'}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                        ${alerts.length > 10 ? `<div class="list-group-item small text-muted text-center">...and ${alerts.length - 10} more alerts</div>` : ''}
+                    </div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Active Alerts</h6>
+                    <p class="small text-muted">No active alerts</p>
+                </div>
+            `;
+        }
+
         detailsContent.innerHTML = html;
 
     } catch (err) {
@@ -403,6 +536,387 @@ function getStatusBadgeClass(status) {
             return 'bg-info';
         default:
             return 'bg-secondary';
+    }
+}
+
+function formatConnectionString(connectionString) {
+    // Insert username:password@ placeholder after the protocol
+    if (!connectionString) return connectionString;
+    const match = connectionString.match(/^(mongodb(?:\+srv)?:\/\/)(.*)/);
+    if (match) {
+        return `${match[1]}<strong>username:password@</strong>${match[2]}`;
+    }
+    return connectionString;
+}
+
+// Shared cluster details display function - same code path for all cluster detail views
+async function showClusterDetails(clusterId, projectId) {
+    const detailsContent = document.getElementById('clusterDetailsContent');
+
+    // Show loading state
+    detailsContent.innerHTML = `
+        <div class="text-center my-5">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Loading cluster details...</p>
+        </div>
+    `;
+
+    // Open the offcanvas immediately
+    const offcanvas = new bootstrap.Offcanvas(document.getElementById('clusterDetailsPanel'));
+    offcanvas.show();
+
+    try {
+        // Fetch cluster details
+        const clusterResponse = await fetch(`/api/clusters/${projectId}`);
+        if (!clusterResponse.ok) throw new Error('Failed to fetch cluster');
+        const clustersData = await clusterResponse.json();
+        const cluster = (clustersData.results || []).find(c => c.id === clusterId || c.name === clusterId);
+
+        if (!cluster) throw new Error('Cluster not found');
+
+        // Fetch additional data in parallel
+        const [alertsData, snapshotsData, advancedConfigData, usersData] = await Promise.all([
+            fetch(`/api/alerts/${projectId}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+            fetch(`/api/backups/${projectId}/${cluster.name}/snapshots`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
+            fetch(`/api/clusters/${projectId}/${cluster.name}/advanced-configuration`).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+            fetch(`/api/users/${projectId}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] }))
+        ]);
+
+        const alerts = (alertsData.results || []).filter(alert => alert.clusterName === cluster.name);
+        const snapshots = snapshotsData.results || [];
+        const advancedConfig = advancedConfigData;
+        const users = usersData.results || [];
+        const statusClass = getStatusBadgeClass(cluster.stateName);
+
+        // Build comprehensive details HTML
+        let html = `
+            <h5 class="mb-3">
+                <i class="bi bi-hdd-rack"></i> ${cluster.name}
+            </h5>
+
+            <div class="mb-3">
+                <span class="badge ${statusClass}">${cluster.stateName || 'UNKNOWN'}</span>
+                ${cluster.paused ? '<span class="badge bg-warning text-dark ms-1">PAUSED</span>' : ''}
+                ${alerts.length > 0 ? `<span class="badge bg-danger ms-1">${alerts.length} Alert${alerts.length > 1 ? 's' : ''}</span>` : ''}
+            </div>
+
+            <div class="mb-3">
+                <h6 class="text-muted">Basic Information</h6>
+                <table class="table table-sm">
+                    <tbody>
+                        <tr><th width="40%">Name</th><td>${cluster.name}</td></tr>
+                        ${cluster.id ? `<tr><th>ID</th><td><code class="small">${cluster.id}</code></td></tr>` : ''}
+                        ${cluster.groupId ? `<tr><th>Group ID</th><td><code class="small">${cluster.groupId}</code></td></tr>` : ''}
+                        <tr><th>Status</th><td><span class="badge ${statusClass}">${cluster.stateName || 'UNKNOWN'}</span></td></tr>
+                        <tr><th>Cluster Type</th><td>${cluster.clusterType || 'N/A'}</td></tr>
+                        <tr><th>MongoDB Version</th><td>${cluster.mongoDBVersion || 'N/A'}</td></tr>
+                        ${cluster.mongoDBMajorVersion ? `<tr><th>Major Version</th><td>${cluster.mongoDBMajorVersion}</td></tr>` : ''}
+                        ${cluster.createDate ? `<tr><th>Created</th><td>${new Date(cluster.createDate).toLocaleString()}</td></tr>` : ''}
+                        ${cluster.replicationFactor ? `<tr><th>Replication Factor</th><td>${cluster.replicationFactor}</td></tr>` : ''}
+                        ${cluster.numShards ? `<tr><th>Number of Shards</th><td>${cluster.numShards}</td></tr>` : ''}
+                        ${cluster.diskSizeGB ? `<tr><th>Disk Size</th><td>${cluster.diskSizeGB} GB</td></tr>` : ''}
+                        ${cluster.paused !== undefined ? `<tr><th>Paused</th><td><span class="badge ${cluster.paused ? 'bg-warning' : 'bg-success'}">${cluster.paused ? 'Yes' : 'No'}</span></td></tr>` : ''}
+                        ${cluster.backupEnabled !== undefined ? `<tr><th>Backup Enabled</th><td><span class="badge ${cluster.backupEnabled ? 'bg-success' : 'bg-secondary'}">${cluster.backupEnabled ? 'Yes' : 'No'}</span></td></tr>` : ''}
+                        ${cluster.providerBackupEnabled !== undefined ? `<tr><th>Provider Backup</th><td><span class="badge ${cluster.providerBackupEnabled ? 'bg-success' : 'bg-secondary'}">${cluster.providerBackupEnabled ? 'Yes' : 'No'}</span></td></tr>` : ''}
+                        ${cluster.pitEnabled !== undefined ? `<tr><th>Point-in-Time Restore</th><td><span class="badge ${cluster.pitEnabled ? 'bg-success' : 'bg-secondary'}">${cluster.pitEnabled ? 'Enabled' : 'Disabled'}</span></td></tr>` : ''}
+                        ${snapshots.length > 0 ? `<tr><th>Snapshots</th><td><span class="badge bg-info">${snapshots.length}</span></td></tr>` : ''}
+                        ${cluster.encryptionAtRestProvider ? `<tr><th>Encryption Provider</th><td>${cluster.encryptionAtRestProvider}</td></tr>` : ''}
+                        ${cluster.versionReleaseSystem ? `<tr><th>Version Release System</th><td>${cluster.versionReleaseSystem}</td></tr>` : ''}
+                        ${cluster.rootCertType ? `<tr><th>Root Cert Type</th><td>${cluster.rootCertType}</td></tr>` : ''}
+                    </tbody>
+                </table>
+            </div>
+        `;
+
+        // Provider settings
+        if (cluster.providerSettings) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Provider Settings</h6>
+                    <table class="table table-sm">
+                        <tbody>
+                            ${cluster.providerSettings.providerName ? `<tr><th width="40%">Provider</th><td>${cluster.providerSettings.providerName}</td></tr>` : ''}
+                            ${cluster.providerSettings.regionName ? `<tr><th>Region</th><td>${cluster.providerSettings.regionName}</td></tr>` : ''}
+                            ${cluster.providerSettings.instanceSizeName ? `<tr><th>Instance Size</th><td>${cluster.providerSettings.instanceSizeName}</td></tr>` : ''}
+                            ${cluster.providerSettings.backingProviderName ? `<tr><th>Backing Provider</th><td>${cluster.providerSettings.backingProviderName}</td></tr>` : ''}
+                            ${cluster.providerSettings.diskIOPS ? `<tr><th>Disk IOPS</th><td>${cluster.providerSettings.diskIOPS}</td></tr>` : ''}
+                            ${cluster.providerSettings.encryptEBSVolume !== undefined ? `<tr><th>Encrypted EBS</th><td><span class="badge ${cluster.providerSettings.encryptEBSVolume ? 'bg-success' : 'bg-secondary'}">${cluster.providerSettings.encryptEBSVolume ? 'Yes' : 'No'}</span></td></tr>` : ''}
+                            ${cluster.providerSettings.volumeType ? `<tr><th>Volume Type</th><td>${cluster.providerSettings.volumeType}</td></tr>` : ''}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // Auto-scaling settings
+        if (cluster.autoScaling || (cluster.providerSettings && cluster.providerSettings.autoScaling)) {
+            const autoScaling = cluster.autoScaling || cluster.providerSettings.autoScaling;
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Auto-Scaling</h6>
+                    <table class="table table-sm">
+                        <tbody>
+                            ${autoScaling.compute ? `
+                                <tr><th width="40%">Compute Enabled</th><td><span class="badge ${autoScaling.compute.enabled ? 'bg-success' : 'bg-secondary'}">${autoScaling.compute.enabled ? 'Yes' : 'No'}</span></td></tr>
+                                ${autoScaling.compute.scaleDownEnabled !== undefined ? `<tr><th>Scale Down</th><td><span class="badge ${autoScaling.compute.scaleDownEnabled ? 'bg-success' : 'bg-secondary'}">${autoScaling.compute.scaleDownEnabled ? 'Enabled' : 'Disabled'}</span></td></tr>` : ''}
+                                ${autoScaling.compute.minInstanceSize ? `<tr><th>Min Instance</th><td>${autoScaling.compute.minInstanceSize}</td></tr>` : ''}
+                                ${autoScaling.compute.maxInstanceSize ? `<tr><th>Max Instance</th><td>${autoScaling.compute.maxInstanceSize}</td></tr>` : ''}
+                            ` : ''}
+                            ${autoScaling.diskGBEnabled !== undefined ? `<tr><th>Disk Auto-Scaling</th><td><span class="badge ${autoScaling.diskGBEnabled ? 'bg-success' : 'bg-secondary'}">${autoScaling.diskGBEnabled ? 'Enabled' : 'Disabled'}</span></td></tr>` : ''}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // Replication specs
+        if (cluster.replicationSpecs && cluster.replicationSpecs.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Replication Specs</h6>
+            `;
+            cluster.replicationSpecs.forEach((spec, idx) => {
+                html += `
+                    <div class="mb-2">
+                        <strong>Region ${idx + 1}: ${spec.zoneName || 'N/A'}</strong>
+                        <table class="table table-sm table-bordered mt-1">
+                            <tbody>
+                                ${spec.numShards ? `<tr><th width="40%">Shards</th><td>${spec.numShards}</td></tr>` : ''}
+                                ${spec.regionsConfig ? Object.keys(spec.regionsConfig).map(region => `
+                                    <tr><th>${region}</th><td>
+                                        Priority: ${spec.regionsConfig[region].priority || 0},
+                                        Nodes: ${spec.regionsConfig[region].electableNodes || 0} electable,
+                                        ${spec.regionsConfig[region].readOnlyNodes || 0} read-only,
+                                        ${spec.regionsConfig[region].analyticsNodes || 0} analytics
+                                    </td></tr>
+                                `).join('') : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        }
+
+        // Advanced configuration
+        if (advancedConfig && Object.keys(advancedConfig).length > 0) {
+            const configKeys = Object.keys(advancedConfig).filter(k => !k.startsWith('_') && k !== 'links');
+            if (configKeys.length > 0) {
+                html += `
+                    <div class="mb-3">
+                        <h6 class="text-muted">Advanced Configuration</h6>
+                        <table class="table table-sm">
+                            <tbody>
+                                ${configKeys.slice(0, 10).map(key => `
+                                    <tr><th width="40%">${key}</th><td><code class="small">${JSON.stringify(advancedConfig[key])}</code></td></tr>
+                                `).join('')}
+                                ${configKeys.length > 10 ? `<tr><td colspan="2" class="small text-muted text-center">...and ${configKeys.length - 10} more settings</td></tr>` : ''}
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+            }
+        }
+
+        // BI Connector
+        if (cluster.biConnector) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">BI Connector</h6>
+                    <table class="table table-sm">
+                        <tbody>
+                            ${cluster.biConnector.enabled !== undefined ? `<tr><th width="40%">Enabled</th><td>${cluster.biConnector.enabled ? 'Yes' : 'No'}</td></tr>` : ''}
+                            ${cluster.biConnector.readPreference ? `<tr><th>Read Preference</th><td>${cluster.biConnector.readPreference}</td></tr>` : ''}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // Labels/Tags
+        if (cluster.labels && cluster.labels.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Labels</h6>
+                    ${cluster.labels.map(label =>
+                        `<span class="badge bg-secondary me-1">${label.key}: ${label.value}</span>`
+                    ).join('')}
+                </div>
+            `;
+        }
+
+        if (cluster.tags && cluster.tags.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Tags</h6>
+                    ${cluster.tags.map(tag => `<span class="badge bg-secondary me-1">${tag}</span>`).join('')}
+                </div>
+            `;
+        }
+
+        // Connection strings
+        if (cluster.connectionStrings) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Connection Strings</h6>
+                    <div class="small">
+            `;
+
+            if (cluster.connectionStrings.standardSrv) {
+                html += `
+                    <div class="mb-2">
+                        <strong>Standard SRV:</strong><br>
+                        <code class="small text-break">${formatConnectionString(cluster.connectionStrings.standardSrv)}</code>
+                    </div>
+                `;
+            }
+
+            if (cluster.connectionStrings.standard) {
+                html += `
+                    <div class="mb-2">
+                        <strong>Standard:</strong><br>
+                        <code class="small text-break">${formatConnectionString(cluster.connectionStrings.standard)}</code>
+                    </div>
+                `;
+            }
+
+            if (cluster.connectionStrings.private) {
+                html += `
+                    <div class="mb-2">
+                        <strong>Private:</strong><br>
+                        <code class="small text-break">${formatConnectionString(cluster.connectionStrings.private)}</code>
+                    </div>
+                `;
+            }
+
+            if (cluster.connectionStrings.privateSrv) {
+                html += `
+                    <div class="mb-2">
+                        <strong>Private SRV:</strong><br>
+                        <code class="small text-break">${formatConnectionString(cluster.connectionStrings.privateSrv)}</code>
+                    </div>
+                `;
+            }
+
+            html += `</div></div>`;
+        }
+
+        // Snapshots/Backups
+        if (snapshots.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Recent Snapshots (${snapshots.length})</h6>
+                    <div class="list-group list-group-flush">
+                        ${snapshots.slice(0, 5).map(snapshot => `
+                            <div class="list-group-item py-2 px-2">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-archive-fill text-info me-2"></i>
+                                            <strong>${snapshot.id || 'Snapshot'}</strong>
+                                        </div>
+                                        <div class="small text-muted mt-1">
+                                            ${snapshot.snapshotType ? `Type: ${snapshot.snapshotType}` : ''}
+                                            ${snapshot.createdAt ? ` • Created: ${new Date(snapshot.createdAt).toLocaleString()}` : ''}
+                                        </div>
+                                        ${snapshot.storageSizeBytes ? `<div class="small">Size: ${formatBytes(snapshot.storageSizeBytes)}</div>` : ''}
+                                        ${snapshot.description ? `<div class="small text-muted">${snapshot.description}</div>` : ''}
+                                    </div>
+                                    <span class="badge ${snapshot.status === 'completed' ? 'bg-success' : 'bg-secondary'} ms-2">${snapshot.status || 'N/A'}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                        ${snapshots.length > 5 ? `<div class="list-group-item small text-muted text-center">...and ${snapshots.length - 5} more snapshots</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Active Alerts
+        if (alerts.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Active Alerts (${alerts.length})</h6>
+                    <div class="list-group list-group-flush">
+                        ${alerts.slice(0, 5).map(alert => `
+                            <div class="list-group-item py-2 px-2">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>
+                                            <strong>${alert.typeName || alert.eventTypeName || 'Alert'}</strong>
+                                        </div>
+                                        <div class="small text-muted mt-1">
+                                            ${alert.metricName ? `Metric: ${alert.metricName}` : ''}
+                                        </div>
+                                        ${alert.currentValue ? `<div class="small">Current: ${JSON.stringify(alert.currentValue)}</div>` : ''}
+                                        <div class="small text-muted">
+                                            ${alert.created ? new Date(alert.created).toLocaleString() : ''}
+                                        </div>
+                                    </div>
+                                    <span class="badge ${alert.status === 'OPEN' ? 'bg-warning' : 'bg-secondary'} ms-2">${alert.status || 'OPEN'}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                        ${alerts.length > 5 ? `<div class="list-group-item small text-muted text-center">...and ${alerts.length - 5} more alerts</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Database users
+        if (users.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Database Users (${users.length})</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Database</th>
+                                    <th>Roles</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${users.map(user => `
+                                    <tr>
+                                        <td><strong>${user.username}</strong></td>
+                                        <td><code class="small">${user.databaseName || 'admin'}</code></td>
+                                        <td>
+                                            ${user.roles && user.roles.length > 0 ?
+                                                user.roles.map(role => `<span class="badge bg-secondary me-1">${role.roleName}</span>`).join('') :
+                                                '<span class="text-muted">No roles</span>'
+                                            }
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">Database Users</h6>
+                    <p class="small text-muted">No database users in this project</p>
+                </div>
+            `;
+        }
+
+        detailsContent.innerHTML = html;
+
+    } catch (err) {
+        console.error('Error loading cluster details:', err);
+        detailsContent.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="bi bi-exclamation-triangle"></i>
+                Failed to load cluster details: ${err.message}
+            </div>
+        `;
     }
 }
 
@@ -504,26 +1018,213 @@ document.addEventListener('DOMContentLoaded', function() {
 async function executeDeleteProject() {
     if (!deleteProjectId) return;
 
-    const btn = document.getElementById('deleteConfirmBtn');
+    // Capture project info for the queue
+    const projectId = deleteProjectId;
+    const projectName = deleteProjectNameExpected;
+
+    // Close the modal immediately
+    const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+    modal.hide();
+
+    // Queue the deletion operation
+    window.operationQueue.enqueue({
+        type: 'delete_project',
+        name: `Delete Project: ${projectName}`,
+        metadata: {
+            projectId: projectId,
+            projectName: projectName
+        },
+        execute: async (updateProgress) => {
+            try {
+                // Step 1: Get all clusters in the project
+                updateProgress('Loading clusters...');
+                const clustersResponse = await fetch(`/api/clusters/${projectId}`);
+                const clustersData = await clustersResponse.ok ? await clustersResponse.json() : { results: [] };
+                const clusters = clustersData.results || [];
+
+                // Step 2: Delete all clusters first
+                if (clusters.length > 0) {
+                    console.log(`Deleting ${clusters.length} cluster(s) before deleting project...`);
+
+                    for (let i = 0; i < clusters.length; i++) {
+                        const cluster = clusters[i];
+                        updateProgress(`Deleting clusters (${i + 1}/${clusters.length})...`);
+
+                        try {
+                            const deleteClusterResponse = await fetch(`/api/clusters/${projectId}/${cluster.name}`, {
+                                method: 'DELETE'
+                            });
+
+                            if (!deleteClusterResponse.ok) {
+                                console.warn(`Failed to delete cluster ${cluster.name}, continuing anyway...`);
+                            } else {
+                                console.log(`Cluster ${cluster.name} deletion initiated`);
+                            }
+                        } catch (clusterErr) {
+                            console.warn(`Error deleting cluster ${cluster.name}:`, clusterErr);
+                        }
+                    }
+
+                    // Step 2.5: Poll cluster statuses until all are deleted
+                    updateProgress('Waiting for cluster deletions to complete...');
+
+                    const maxWaitTime = 600000; // 10 minutes max wait (cluster deletion can be very slow)
+                    const pollInterval = 5000; // Check every 5 seconds
+                    const startTime = Date.now();
+
+                    // Track clusters we're waiting for
+                    const clusterNamesToDelete = clustersData.results.map(c => c.name);
+                    const stillDeleting = new Set(clusterNamesToDelete);
+
+                    while (stillDeleting.size > 0 && (Date.now() - startTime) < maxWaitTime) {
+                        await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+                        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+
+                        // Check status of each remaining cluster
+                        for (const clusterName of Array.from(stillDeleting)) {
+                            try {
+                                const statusResponse = await fetch(`/api/clusters/${projectId}/${clusterName}`);
+
+                                if (statusResponse.status === 404) {
+                                    // Cluster is fully deleted
+                                    console.log(`Cluster ${clusterName} has been deleted`);
+                                    stillDeleting.delete(clusterName);
+                                } else if (statusResponse.ok) {
+                                    const clusterData = await statusResponse.json();
+                                    const stateName = clusterData.stateName || 'UNKNOWN';
+
+                                    console.log(`Cluster ${clusterName} status: ${stateName} (${elapsed}s elapsed)`);
+
+                                    // If cluster is no longer in DELETING state and still exists, something unexpected happened
+                                    if (stateName !== 'DELETING') {
+                                        console.warn(`Cluster ${clusterName} is in unexpected state: ${stateName}`);
+                                        // We'll keep waiting - it might transition back to DELETING or get deleted
+                                    }
+                                } else {
+                                    console.warn(`Error checking status for cluster ${clusterName}: ${statusResponse.status}`);
+                                }
+                            } catch (err) {
+                                console.warn(`Error polling cluster ${clusterName}:`, err);
+                            }
+                        }
+
+                        if (stillDeleting.size > 0) {
+                            const statusList = Array.from(stillDeleting).join(', ');
+                            updateProgress(`Waiting for ${stillDeleting.size} cluster(s) to be deleted: ${statusList} (${elapsed}s elapsed)`);
+                        }
+                    }
+
+                    if (stillDeleting.size > 0) {
+                        const clusterNames = Array.from(stillDeleting).join(', ');
+                        throw new Error(`Timeout waiting for cluster deletions. The following cluster(s) are still being deleted: ${clusterNames}. Please wait a few more minutes and try deleting the project again.`);
+                    }
+
+                    console.log('All clusters have been deleted successfully');
+                }
+
+                // Step 3: Now delete the project
+                updateProgress('Deleting project...');
+                const response = await fetch(`/api/projects/${projectId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    let errorMessage = 'Failed to delete project';
+
+                    // Special handling for 409 Conflict (clusters still exist)
+                    if (response.status === 409) {
+                        errorMessage = 'Cannot delete project - clusters are still being deleted by MongoDB Atlas. This can take 5-10 minutes. Please wait and try again later.';
+                    } else {
+                        try {
+                            const error = await response.json();
+                            errorMessage = error.detail || errorMessage;
+                        } catch (parseError) {
+                            errorMessage = `${errorMessage}: ${response.statusText || response.status}`;
+                        }
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                const result = await response.json();
+
+                // Reload projects list
+                loadProjects();
+
+                return { success: true, projectName: projectName };
+
+            } catch (err) {
+                console.error('Error deleting project:', err);
+                throw err;
+            }
+        }
+    });
+}
+
+// Create project functionality
+let currentOrgId = null;
+
+async function executeCreateProject() {
+    const projectName = document.getElementById('projectName').value.trim();
+    const errorDiv = document.getElementById('createProjectError');
+    const btn = document.getElementById('createProjectBtn');
     const originalHtml = btn.innerHTML;
+
+    // Clear previous errors
+    errorDiv.classList.add('d-none');
+
+    // Validate
+    if (!projectName || projectName.length < 2) {
+        errorDiv.textContent = 'Project name must be at least 2 characters long';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+
+    // Get current organization ID
+    if (!currentOrgId) {
+        try {
+            const orgsResponse = await fetch('/api/organizations/');
+            if (!orgsResponse.ok) throw new Error('Failed to fetch organizations');
+            const orgsData = await orgsResponse.json();
+
+            const org = (orgsData.results || []).find(o =>
+                o.id === ORG_ID_OR_NAME || o.name === ORG_ID_OR_NAME
+            );
+
+            if (!org) {
+                throw new Error(`Organization "${ORG_ID_OR_NAME}" not found`);
+            }
+
+            currentOrgId = org.id;
+        } catch (err) {
+            errorDiv.textContent = `Failed to get organization: ${err.message}`;
+            errorDiv.classList.remove('d-none');
+            return;
+        }
+    }
 
     // Show loading state
     btn.disabled = true;
-    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Deleting...';
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Creating...';
 
     try {
-        const response = await fetch(`/api/projects/${deleteProjectId}`, {
-            method: 'DELETE'
+        const response = await fetch('/api/projects/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: projectName,
+                orgId: currentOrgId
+            })
         });
 
-        let errorMessage = 'Failed to delete project';
-
         if (!response.ok) {
+            let errorMessage = 'Failed to create project';
             try {
                 const error = await response.json();
                 errorMessage = error.detail || errorMessage;
             } catch (parseError) {
-                // If response is not JSON, use status text
                 errorMessage = `${errorMessage}: ${response.statusText || response.status}`;
             }
             throw new Error(errorMessage);
@@ -532,15 +1233,18 @@ async function executeDeleteProject() {
         const result = await response.json();
 
         // Close modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+        const modal = bootstrap.Modal.getInstance(document.getElementById('createProjectModal'));
         modal.hide();
+
+        // Clear form
+        document.getElementById('projectName').value = '';
 
         // Show success message
         const successAlert = document.createElement('div');
         successAlert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
         successAlert.style.zIndex = '9999';
         successAlert.innerHTML = `
-            <i class="bi bi-check-circle"></i> Project "${deleteProjectNameExpected}" has been deleted successfully
+            <i class="bi bi-check-circle"></i> Project "${projectName}" has been created successfully
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
         document.body.appendChild(successAlert);
@@ -550,25 +1254,34 @@ async function executeDeleteProject() {
         loadProjects();
 
     } catch (err) {
-        console.error('Error deleting project:', err);
-
-        // Show error in a more visible way
-        const errorAlert = document.createElement('div');
-        errorAlert.className = 'alert alert-danger alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
-        errorAlert.style.zIndex = '9999';
-        errorAlert.innerHTML = `
-            <i class="bi bi-exclamation-triangle"></i> <strong>Failed to delete project:</strong><br>
-            ${err.message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        `;
-        document.body.appendChild(errorAlert);
+        console.error('Error creating project:', err);
+        errorDiv.textContent = err.message;
+        errorDiv.classList.remove('d-none');
 
         // Re-enable button
         btn.disabled = false;
         btn.innerHTML = originalHtml;
-
-        // Keep modal open so user can try again
     }
 }
+
+// Helper function to format bytes
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+// Reset form when modal is closed
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('createProjectModal');
+    modal.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('projectName').value = '';
+        document.getElementById('createProjectError').classList.add('d-none');
+        document.getElementById('createProjectBtn').disabled = false;
+        document.getElementById('createProjectBtn').innerHTML = '<i class="bi bi-plus-circle"></i> Create Project';
+    });
+});
 </script>
 {% endblock %}

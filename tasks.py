@@ -220,15 +220,15 @@ def info(c):
 
 
 @task
-def configure_service_account(c):
+def configure(c):
     """
-    Interactively configure Atlas service account.
+    Interactively configure Atlas authentication.
 
-    This task walks you through setting up OAuth 2.0 service account
-    authentication for MongoDB Atlas.
+    This task walks you through setting up authentication for MongoDB Atlas.
+    Choose between API Keys or Service Account authentication.
     """
-    print("Starting interactive service account setup...\n")
-    c.run("uv run python -m atlasui.setup", pty=True)
+    print("Starting interactive configuration...\n")
+    c.run("uv run atlasui-configure", pty=True)
 
 
 @task(pre=[format, lint, test])

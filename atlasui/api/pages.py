@@ -51,10 +51,10 @@ async def home(request: Request):
 
 
 @router.get("/setup", response_class=HTMLResponse)
-async def setup_wizard(request: Request):
+async def setup_wizard(request: Request, register: bool = False):
     """Render the setup wizard page."""
-    # If already configured, redirect to organizations
-    if is_configured():
+    # If already configured and not explicitly registering a new org, redirect to organizations
+    if is_configured() and not register:
         return RedirectResponse(url="/organizations", status_code=302)
 
     return templates.TemplateResponse("setup.html", {"request": request})
@@ -72,15 +72,6 @@ async def organization_projects(request: Request, org_id_or_name: str):
     return templates.TemplateResponse("projects.html", {
         "request": request,
         "org_id_or_name": org_id_or_name
-    })
-
-
-@router.get("/projects/{project_id_or_name}", response_class=HTMLResponse)
-async def project_clusters(request: Request, project_id_or_name: str):
-    """Render the clusters page for a specific project."""
-    return templates.TemplateResponse("clusters.html", {
-        "request": request,
-        "project_id_or_name": project_id_or_name
     })
 
 

@@ -288,7 +288,18 @@ async def create_cluster(
         with AtlasClient() as client:
             return client.create_cluster(project_id, cluster_config)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e)
+        # Try to extract status code from error message if present
+        if "400" in error_msg or "Bad Request" in error_msg:
+            raise HTTPException(status_code=400, detail=error_msg)
+        elif "401" in error_msg or "Unauthorized" in error_msg:
+            raise HTTPException(status_code=401, detail=error_msg)
+        elif "403" in error_msg or "Forbidden" in error_msg:
+            raise HTTPException(status_code=403, detail=error_msg)
+        elif "404" in error_msg or "Not Found" in error_msg:
+            raise HTTPException(status_code=404, detail=error_msg)
+        else:
+            raise HTTPException(status_code=500, detail=error_msg)
 
 
 @router.patch("/{project_id}/{cluster_name}")

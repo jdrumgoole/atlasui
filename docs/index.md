@@ -9,6 +9,7 @@ providing both a web-based interface and CLI tool for managing MongoDB Atlas res
 
 installation
 quickstart
+features
 service_accounts
 security
 ```
@@ -19,6 +20,9 @@ security
 * **CLI Tool**: Command-line interface for Atlas operations
 * **Complete API Coverage**: Built from official MongoDB Atlas OpenAPI specifications
 * **Modern Stack**: FastAPI, Typer, Rich, and modern Python tooling
+* **Operation Queue**: Intelligent queuing system for long-running operations with real-time progress tracking
+* **Status-Based Polling**: Accurate cluster status monitoring for reliable deletion operations
+* **Responsive Design**: Mobile-friendly Bootstrap 5 interface with real-time updates
 
 ## Atlas API Coverage
 

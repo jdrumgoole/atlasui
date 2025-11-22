@@ -60,14 +60,18 @@ This wizard will:
 
 ### Authentication Methods
 
-#### API Keys (Recommended) ⭐
+AtlasUI supports two authentication methods. **Both provide the same capabilities** - full access to one organization including all projects and clusters. The key difference is the authentication approach:
 
-**Best for:** Full AtlasUI functionality
+#### API Keys (Traditional)
 
-API keys provide **organization-level** access, allowing AtlasUI to:
-- Manage all organizations in your Atlas account
-- Access all projects across organizations
-- Control all clusters across all projects
+**Best for:** Simple setup, traditional workflows
+
+API keys provide **organization-level** access using traditional digest authentication:
+- Manage a single organization in your Atlas account
+- Access all projects within that organization
+- Control all clusters within those projects
+- Simpler setup process
+- HTTP Basic Auth (Digest)
 
 **Quick start:**
 ```bash
@@ -77,32 +81,41 @@ atlasui-configure
 ```
 
 **How to get API keys:**
-1. Go to https://cloud.mongodb.com/v2#/preferences/organizations
-2. Select your organization from the list
-3. In the sidebar, click **Applications**
-4. Choose **API Key** (not Service Account)
-5. Create API Key with Organization Owner permissions
-6. Copy Public Key and Private Key
+1. Go to your organization's API Keys page:
+   - Direct link: `https://cloud.mongodb.com/v2#/org/<Organization ID>/access/apiKeys`
+   - Or navigate: https://cloud.mongodb.com/v2#/preferences/organizations → Select organization → Access Manager → API Keys
+2. Click **Create API Key**
+3. Set permissions: **Organization Owner**
+4. Copy the **Public Key** and **Private Key**
+5. Add your IP address to the API Key whitelist
 
-#### Service Accounts (Limited) ⚠️
+#### Service Accounts (Modern & More Secure)
 
-**Best for:** Single project operations only
+**Best for:** Modern applications, higher security requirements
 
-**⚠️ Important Limitation**: Service accounts are **project-scoped** - each can only access ONE project.
-
-Since AtlasUI needs organization-level access, service accounts have **limited utility**.
-
-**Only use service accounts if:**
-- You only need to manage a single specific project
-- You prefer OAuth 2.0 authentication
-- You understand you won't have full AtlasUI functionality
+Service accounts provide **the same organization-level access as API Keys** using modern OAuth 2.0:
+- Access all projects within the organization
+- Control all clusters within those projects
+- Modern OAuth 2.0 authentication with JWT tokens
+- More secure token-based authentication
+- Industry-standard authentication approach
 
 **Setup:**
 ```bash
 atlasui-configure
 # Choose option 2 (Service Account)
-# Follow the wizard (will warn about limitations)
+# Follow the wizard instructions
 ```
+
+**How to get service account credentials:**
+1. Go to your organization's Service Accounts page:
+   - Direct link: `https://cloud.mongodb.com/v2#/org/<Organization ID>/access/serviceAccounts`
+   - Or navigate: https://cloud.mongodb.com/v2#/preferences/organizations → Select organization → Access Manager → Service Accounts
+2. Click **Create Service Account**
+3. Assign **organization-level roles** (e.g., Organization Owner) for full access
+4. Copy the **Client ID** and **Client Secret**
+
+**Note:** Both API Keys and Service Accounts are scoped to a single organization. To work with a different organization, you'll need to configure credentials for that organization.
 
 See [Service Account Documentation](docs/service_accounts.md) for details.
 

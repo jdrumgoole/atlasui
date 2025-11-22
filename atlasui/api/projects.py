@@ -2,7 +2,7 @@
 API routes for MongoDB Atlas Projects (Groups).
 """
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Body
 from typing import Dict, Any, List
 
 from atlasui.client import AtlasClient
@@ -28,6 +28,28 @@ async def list_projects(
     try:
         with AtlasClient() as client:
             return client.list_projects(page_num=page_num, items_per_page=items_per_page)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/")
+async def create_project(
+    name: str = Body(..., embed=True),
+    orgId: str = Body(..., embed=True)
+) -> Dict[str, Any]:
+    """
+    Create a new project.
+
+    Args:
+        name: Project name
+        orgId: Organization ID
+
+    Returns:
+        Created project details
+    """
+    try:
+        with AtlasClient() as client:
+            return client.create_project(name=name, org_id=orgId)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

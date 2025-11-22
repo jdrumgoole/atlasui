@@ -45,32 +45,42 @@ def print_auth_comparison():
     table = Table(title="Authentication Methods Comparison", show_header=True)
     table.add_column("Feature", style="cyan", width=25)
     table.add_column("API Keys", style="green", width=30)
-    table.add_column("Service Accounts", style="yellow", width=30)
+    table.add_column("Service Accounts", style="green", width=30)
 
     table.add_row(
+        "Capabilities",
+        "[bold green]Same[/bold green]",
+        "[bold green]Same[/bold green]"
+    )
+    table.add_row(
         "Scope",
-        "[bold green]Organization-level[/bold green]",
-        "[bold yellow]Project-level only[/bold yellow]"
+        "[bold yellow]Single organization[/bold yellow]",
+        "[bold yellow]Single organization[/bold yellow]"
     )
     table.add_row(
         "AtlasUI Compatibility",
-        "[bold green]Full (Recommended)[/bold green]",
-        "[bold yellow]Limited[/bold yellow]"
+        "[bold green]Full[/bold green]",
+        "[bold green]Full[/bold green]"
     )
     table.add_row(
         "Setup Complexity",
-        "[bold green]Simple[/bold green]",
+        "[bold green]Simpler[/bold green]",
         "[bold yellow]Moderate[/bold yellow]"
     )
     table.add_row(
-        "Security",
-        "Moderate (with rotation)",
-        "High (JWT-based)"
+        "Authentication Type",
+        "Digest Auth (HTTP Basic)",
+        "OAuth 2.0 (JWT tokens)"
     )
     table.add_row(
-        "Use Case",
-        "Managing all org resources",
-        "Single project operations"
+        "Security Level",
+        "Standard",
+        "[bold green]More Secure[/bold green]"
+    )
+    table.add_row(
+        "Best For",
+        "Quick setup, traditional workflows",
+        "Modern applications, higher security needs"
     )
 
     console.print("\n")
@@ -78,26 +88,37 @@ def print_auth_comparison():
     console.print("\n")
 
     # Add important note
-    note = Panel.fit(
-        """[bold yellow]⚠️  Important Note About Service Accounts[/bold yellow]
+    note = Panel(
+        """[bold cyan]ℹ️  Both Methods Provide the Same Capabilities[/bold cyan]
 
-Service accounts in MongoDB Atlas are [bold]project-scoped[/bold], meaning each service account
-can only access resources within a single project.
+[bold green]Both API Keys and Service Accounts provide:[/bold green]
+• Full access to ONE organization
+• Access to all projects within that organization
+• Access to all clusters within those projects
+• Same API functionality and features
 
-[bold cyan]AtlasUI is designed to manage:[/bold cyan]
-• [bold]All[/bold] organizations in your Atlas account
-• [bold]All[/bold] projects across organizations
-• [bold]All[/bold] clusters across all projects
+[bold yellow]The key difference is authentication approach:[/bold yellow]
 
-[bold green]Recommendation:[/bold green] Use [bold]API Keys[/bold] for full AtlasUI functionality.
+[bold]API Keys (Traditional):[/bold]
+• Digest authentication (HTTP Basic Auth)
+• Simpler, more straightforward setup
+• Good for quick starts and traditional workflows
 
-[bold yellow]Service accounts are suitable when:[/bold yellow]
-• You only need to manage a single project
-• You prefer OAuth 2.0 authentication
-• You need fine-grained permissions for one project
+[bold]Service Accounts (Modern & More Secure):[/bold]
+• OAuth 2.0 with JWT token-based authentication
+• More secure, industry-standard approach
+• Better for modern applications and higher security requirements
+
+[bold cyan]Recommendation:[/bold cyan]
+• Use [bold]Service Accounts[/bold] for new setups and when security is a priority
+• Use [bold]API Keys[/bold] for simpler setup or existing workflows
+• Either method works perfectly with AtlasUI
+• To manage multiple organizations, configure separate credentials for each
         """,
-        border_style="yellow",
-        title="Service Account Limitations"
+        border_style="cyan",
+        title="Authentication Methods",
+        width=90,
+        padding=(1, 2)
     )
     console.print(note)
     console.print("\n")
@@ -107,12 +128,16 @@ def choose_auth_method() -> AuthMethod:
     """Let user choose authentication method."""
     print_auth_comparison()
 
+    console.print("[bold]Select your authentication method:[/bold]")
+    console.print("  [bold cyan]1.[/bold cyan] API Keys")
+    console.print("  [bold cyan]2.[/bold cyan] Service Account")
+    console.print()
+
     choice = Prompt.ask(
-        "[bold]Choose authentication method[/bold]",
+        "[bold]Enter your choice[/bold]",
         choices=["1", "2"],
         default="1",
-        console=console,
-        show_choices=False
+        console=console
     )
 
     console.print()
@@ -120,21 +145,6 @@ def choose_auth_method() -> AuthMethod:
     if choice == "1":
         return "api_key"
     else:
-        # Confirm they understand the limitation
-        console.print("[bold yellow]You selected Service Account authentication.[/bold yellow]\n")
-        console.print("Remember: Service accounts are [bold]project-scoped[/bold].")
-        console.print("AtlasUI requires [bold]organization-level[/bold] access for full functionality.\n")
-
-        continue_anyway = Confirm.ask(
-            "[bold]Continue with Service Account setup anyway?[/bold]",
-            default=False,
-            console=console
-        )
-
-        if not continue_anyway:
-            console.print("\n[green]Good choice! Switching to API Key setup...[/green]\n")
-            return "api_key"
-
         return "service_account"
 
 
@@ -397,34 +407,7 @@ However, the connection test failed. Please:
 
 def configure_service_account() -> int:
     """Configure Service Account authentication."""
-    console.print("\n[bold yellow]═══ Service Account Configuration ═══[/bold yellow]\n")
-
-    # Show warning again
-    warning = Panel.fit(
-        """[bold yellow]⚠️  Remember: Service Account Limitations[/bold yellow]
-
-Service accounts are [bold]project-scoped[/bold]. This means:
-
-• Each service account can only access [bold]ONE[/bold] project
-• AtlasUI needs access to [bold]ALL[/bold] organizations and projects
-• You will have [bold]limited functionality[/bold] with service accounts
-
-[bold green]Recommended:[/bold green] Cancel this and use API Keys instead.
-        """,
-        border_style="yellow"
-    )
-    console.print(warning)
-    console.print()
-
-    continue_sa = Confirm.ask(
-        "[bold]Continue with Service Account setup?[/bold]",
-        default=False,
-        console=console
-    )
-
-    if not continue_sa:
-        console.print("\n[green]Switching to API Key setup...[/green]\n")
-        return configure_api_key()
+    console.print("\n[bold cyan]═══ Service Account Configuration ═══[/bold cyan]\n")
 
     # Check if ServiceAccountManager is available
     if ServiceAccountManager is None:
@@ -434,16 +417,19 @@ Service accounts are [bold]project-scoped[/bold]. This means:
     instructions = Panel.fit(
         """[bold]To get service account credentials:[/bold]
 
-1. Go to: [bold]https://cloud.mongodb.com[/bold]
+1. Go to: [bold]https://cloud.mongodb.com/v2#/preferences/organizations[/bold]
 2. Select your organization
 3. Click [bold]Access Manager[/bold] → [bold]Service Accounts[/bold]
 4. Click [bold]Create Service Account[/bold]
-5. Enter description and assign roles for [bold]ONE PROJECT[/bold]
+5. Enter description and assign [bold]organization-level roles[/bold]
 6. Save and copy the [bold]Client ID[/bold] and [bold]Client Secret[/bold]
    [yellow]⚠️  The Client Secret is only shown once![/yellow]
+
+[bold yellow]Note:[/bold yellow] Service accounts are organization-scoped.
+They can only access resources within the organization where they are created.
         """,
         title="📋 Getting Service Account Credentials",
-        border_style="yellow"
+        border_style="cyan"
     )
     console.print(instructions)
     console.print()
@@ -452,7 +438,7 @@ Service accounts are [bold]project-scoped[/bold]. This means:
     # ... (continue with the existing service account setup logic)
 
     console.print("\n[yellow]Note: Full service account setup requires additional implementation.[/yellow]")
-    console.print("[yellow]For now, please use API Key authentication for full functionality.[/yellow]\n")
+    console.print("[cyan]Service accounts with organization-level roles work with AtlasUI.[/cyan]\n")
 
     return configure_api_key()
 
@@ -471,8 +457,8 @@ def interactive_configure() -> int:
         console.print("This wizard will help you set up authentication for MongoDB Atlas.\n")
 
         console.print("[bold cyan]Available authentication methods:[/bold cyan]")
-        console.print("  [bold]1.[/bold] API Keys (Recommended for AtlasUI)")
-        console.print("  [bold]2.[/bold] Service Account (Limited - Project-scoped only)")
+        console.print("  [bold]1.[/bold] API Keys (Simple digest authentication)")
+        console.print("  [bold]2.[/bold] Service Account (OAuth 2.0 / JWT-based)")
         console.print()
 
         # Choose authentication method

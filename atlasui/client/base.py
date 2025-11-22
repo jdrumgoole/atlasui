@@ -137,7 +137,33 @@ class AtlasClient:
             json=json,
         )
 
-        response.raise_for_status()
+        # Check for errors and include Atlas API error details
+        if response.status_code >= 400:
+            error_detail = f"Client error '{response.status_code} {response.reason_phrase}' for url '{url}'"
+            try:
+                error_data = response.json()
+                # Atlas API typically returns error details in these fields
+                if isinstance(error_data, dict):
+                    if 'detail' in error_data:
+                        error_detail = f"{error_detail}\nDetail: {error_data['detail']}"
+                    elif 'error' in error_data:
+                        error_detail = f"{error_detail}\nError: {error_data['error']}"
+                    elif 'errorCode' in error_data:
+                        error_detail = f"{error_detail}\nError Code: {error_data['errorCode']}"
+                        if 'detail' in error_data:
+                            error_detail = f"{error_detail}, Detail: {error_data['detail']}"
+                        if 'reason' in error_data:
+                            error_detail = f"{error_detail}, Reason: {error_data['reason']}"
+                    else:
+                        # Include the entire error response
+                        error_detail = f"{error_detail}\nResponse: {error_data}"
+            except Exception:
+                # If we can't parse the error response, just use the status
+                pass
+
+            # Raise an exception with the detailed error message
+            from httpx import HTTPStatusError
+            raise HTTPStatusError(error_detail, request=response.request, response=response)
 
         if response.status_code == 204:
             return {}
@@ -218,6 +244,22 @@ class AtlasClient:
             Project details
         """
         return self.get(f"/groups/{project_id}")
+
+    def create_project(
+        self, name: str, org_id: str
+    ) -> Dict[str, Any]:
+        """
+        Create a new project.
+
+        Args:
+            name: Project name
+            org_id: Organization ID
+
+        Returns:
+            Created project details
+        """
+        payload = {"name": name, "orgId": org_id}
+        return self.post("/groups", json=payload)
 
     def delete_project(self, project_id: str) -> Dict[str, Any]:
         """

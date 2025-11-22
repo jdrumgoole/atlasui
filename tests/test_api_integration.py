@@ -211,20 +211,8 @@ class TestPagesEndpoints:
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
 
-    def test_project_specific_page(self, client):
-        """Test viewing a specific project's page."""
-        # First, get a project
-        projects_response = client.get("/api/projects/")
-        projects = projects_response.json()["results"]
-
-        if not projects:
-            pytest.skip("No projects available for testing")
-
-        project_name = projects[0]["name"]
-        response = client.get(f"/projects/{project_name}")
-
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
+    # Note: test_project_specific_page removed - per-project clusters page was consolidated
+    # into the global /clusters page
 
 
 @pytest.mark.integration

@@ -65,9 +65,12 @@
                 </div>
                 <div class="card-body">
                     <p class="lead">How would you like to authenticate with MongoDB Atlas?</p>
+                    <div class="alert alert-info mb-3">
+                        <i class="bi bi-info-circle-fill"></i> <strong>Both methods provide the same capabilities</strong> - full access to one organization including all projects and clusters. Service Accounts offer a more modern and secure OAuth 2.0 approach.
+                    </div>
 
-                    <!-- API Key Option (Recommended) -->
-                    <div class="card mb-3 border-success" id="apiKeyOption" style="cursor: pointer;"
+                    <!-- API Key Option -->
+                    <div class="card mb-3 border-primary" id="apiKeyOption" style="cursor: pointer;"
                          onclick="selectAuthMethod('api_key')">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start">
@@ -75,16 +78,17 @@
                                     <h5 class="card-title">
                                         <input type="radio" name="authMethod" value="api_key" checked>
                                         API Keys
-                                        <span class="badge bg-success ms-2">Recommended</span>
+                                        <span class="badge bg-secondary ms-2">Traditional</span>
                                     </h5>
                                     <p class="card-text">
-                                        <strong>Organization-level access</strong><br>
-                                        Full access to all organizations, projects, and clusters in your Atlas account.
+                                        <strong>Same capabilities as Service Accounts</strong><br>
+                                        Traditional digest authentication - simpler setup.
                                     </p>
                                     <ul class="small text-muted mb-0">
-                                        <li>Simplest setup</li>
-                                        <li>Full AtlasUI functionality</li>
-                                        <li>Manage all resources</li>
+                                        <li>Simplest setup process</li>
+                                        <li>Organization-level access</li>
+                                        <li>All projects and clusters within org</li>
+                                        <li>Digest authentication (HTTP Basic)</li>
                                     </ul>
                                 </div>
                                 <i class="bi bi-check-circle-fill text-success fs-2" id="apiKeyCheck"></i>
@@ -93,7 +97,7 @@
                     </div>
 
                     <!-- Service Account Option -->
-                    <div class="card border-warning" id="serviceAccountOption" style="cursor: pointer;"
+                    <div class="card border-success" id="serviceAccountOption" style="cursor: pointer;"
                          onclick="selectAuthMethod('service_account')">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-start">
@@ -101,16 +105,17 @@
                                     <h5 class="card-title">
                                         <input type="radio" name="authMethod" value="service_account">
                                         Service Account
-                                        <span class="badge bg-warning text-dark ms-2">Limited</span>
+                                        <span class="badge bg-success ms-2">More Secure</span>
                                     </h5>
                                     <p class="card-text">
-                                        <strong>Project-level access</strong><br>
-                                        Access limited to a single project only.
+                                        <strong>Same capabilities as API Keys</strong><br>
+                                        Modern OAuth 2.0 authentication - more secure approach.
                                     </p>
                                     <ul class="small text-muted mb-0">
-                                        <li>More complex setup</li>
-                                        <li>Limited to one project</li>
-                                        <li>OAuth 2.0 based</li>
+                                        <li>Modern OAuth 2.0 / JWT-based</li>
+                                        <li>Organization-level access</li>
+                                        <li>All projects and clusters within org</li>
+                                        <li>Token-based authentication (more secure)</li>
                                     </ul>
                                 </div>
                                 <i class="bi bi-circle text-muted fs-2" id="serviceAccountCheck" style="display: none;"></i>
@@ -138,10 +143,16 @@
                     <!-- Instructions -->
                     <div class="alert alert-info">
                         <h6><i class="bi bi-info-circle-fill"></i> How to get your API Keys:</h6>
+                        <p class="small mb-2">
+                            <strong>Direct Link:</strong>
+                            <a href="https://cloud.mongodb.com/v2#/org/YOUR_ORG_ID/access/apiKeys" target="_blank" class="alert-link">
+                                https://cloud.mongodb.com/v2#/org/&lt;Organization ID&gt;/access/apiKeys
+                            </a>
+                            <br>
+                            <em class="text-muted">Replace &lt;Organization ID&gt; with your organization's ID</em>
+                        </p>
                         <ol class="small mb-0">
-                            <li>Go to <a href="https://cloud.mongodb.com" target="_blank" class="alert-link">cloud.mongodb.com</a></li>
-                            <li>Click your organization name → <strong>Access Manager</strong></li>
-                            <li>Click <strong>API Keys</strong> tab</li>
+                            <li>Go to your organization's API Keys page using the link above</li>
                             <li>Click <strong>Create API Key</strong></li>
                             <li>Set permissions: <strong>Organization Owner</strong></li>
                             <li>Copy the <strong>Public Key</strong> and <strong>Private Key</strong></li>
@@ -193,19 +204,25 @@
                     <h4 class="mb-0"><i class="bi bi-shield-lock"></i> Enter Service Account Credentials</h4>
                 </div>
                 <div class="card-body">
-                    <div class="alert alert-warning">
-                        <i class="bi bi-exclamation-triangle-fill"></i> <strong>Remember:</strong> Service accounts are project-scoped. You'll have limited functionality.
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle-fill"></i> <strong>Note:</strong> Both API Keys and Service Accounts are organization-scoped and can access resources within ONE organization at a time. To manage multiple organizations, configure separate credentials for each organization.
                     </div>
 
                     <!-- Instructions -->
                     <div class="alert alert-info">
                         <h6><i class="bi bi-info-circle-fill"></i> How to get service account credentials:</h6>
+                        <p class="small mb-2">
+                            <strong>Direct Link:</strong>
+                            <a href="https://cloud.mongodb.com/v2#/org/YOUR_ORG_ID/access/serviceAccounts" target="_blank" class="alert-link">
+                                https://cloud.mongodb.com/v2#/org/&lt;Organization ID&gt;/access/serviceAccounts
+                            </a>
+                            <br>
+                            <em class="text-muted">Replace &lt;Organization ID&gt; with your organization's ID</em>
+                        </p>
                         <ol class="small mb-0">
-                            <li>Go to <a href="https://cloud.mongodb.com" target="_blank" class="alert-link">cloud.mongodb.com</a></li>
-                            <li>Select your organization</li>
-                            <li>Click <strong>Access Manager</strong> → <strong>Service Accounts</strong></li>
+                            <li>Go to your organization's Service Accounts page using the link above</li>
                             <li>Click <strong>Create Service Account</strong></li>
-                            <li>Assign roles for ONE PROJECT</li>
+                            <li>Assign <strong>organization-level roles</strong> (e.g., Organization Owner) for full access</li>
                             <li>Copy the <strong>Client ID</strong> and <strong>Client Secret</strong></li>
                         </ol>
                     </div>

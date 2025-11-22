@@ -5,3 +5,5 @@
 - keep the pyproject.toml version and the config.py version in sync
 - use atlasui start and atlasui stop to start and stop the service
 - Keep the two cluster pages in sync as much as possible
+- when I say bump the version I always mean by a minor version unless there are breaking changes
+- You can only have one M0 cluster per organization
