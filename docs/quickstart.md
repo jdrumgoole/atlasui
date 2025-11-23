@@ -30,34 +30,42 @@ The dashboard provides an overview of your Atlas resources:
 
 ## Command-Line Interface
 
+### Version Information
+
+```bash
+# Show version
+atlascli --version
+atlasui --version
+```
+
 ### List Projects
 
 ```bash
 # List all projects
-atlasui projects list
+atlascli projects list
 
 # List with pagination
-atlasui projects list --page 2 --limit 50
+atlascli projects list --page 2 --limit 50
 ```
 
 ### Get Project Details
 
 ```bash
 # Get specific project
-atlasui projects get <project-id>
+atlascli projects get <project-id>
 ```
 
 ### Manage Clusters
 
 ```bash
 # List clusters in a project
-atlasui clusters list <project-id>
+atlascli clusters list <project-id>
 
 # Get cluster details
-atlasui clusters get <project-id> <cluster-name>
+atlascli clusters get <project-id> <cluster-name>
 
 # Get cluster details as JSON
-atlasui clusters get <project-id> <cluster-name> --json
+atlascli clusters get <project-id> <cluster-name> --json
 ```
 
 ## API Usage

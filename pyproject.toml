@@ -1,6 +1,6 @@
 [project]
 name = "atlasui"
-version = "0.1.8"
+version = "0.1.9"
 description = "User Interface for MongoDB Atlas - Web UI and CLI tool"
 readme = "README.md"
 authors = [
@@ -41,7 +41,7 @@ docs = [
 
 [project.scripts]
 atlasui = "atlasui.manage:main"
-atlasui-cli = "atlasui.cli:app"
+atlascli = "atlasui.cli:app"
 atlasui-server = "atlasui.server:main"
 atlasui-configure = "atlasui.configure:main"
 

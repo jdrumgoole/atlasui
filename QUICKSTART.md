@@ -41,10 +41,10 @@ ATLAS_PRIVATE_KEY=your_private_key_here
 inv info
 
 # Or directly
-uv run atlasui info
+uv run atlascli info
 
 # List your projects
-uv run atlasui projects list
+uv run atlascli projects list
 ```
 
 ## Start the Web UI
@@ -66,20 +66,20 @@ Open your browser to: http://localhost:8000
 
 ```bash
 # Projects
-atlasui projects list
-atlasui projects get <project-id>
+atlascli projects list
+atlascli projects get <project-id>
 
 # Clusters
-atlasui clusters list <project-id>
-atlasui clusters get <project-id> <cluster-name>
-atlasui clusters delete <project-id> <cluster-name>
+atlascli clusters list <project-id>
+atlascli clusters get <project-id> <cluster-name>
+atlascli clusters delete <project-id> <cluster-name>
 
 # Alerts
-atlasui alerts list <project-id>
+atlascli alerts list <project-id>
 
 # Backups
-atlasui backups list <project-id> <cluster-name>
-atlasui backups schedule <project-id> <cluster-name>
+atlascli backups list <project-id> <cluster-name>
+atlascli backups schedule <project-id> <cluster-name>
 ```
 
 ## Development

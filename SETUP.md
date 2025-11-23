@@ -131,16 +131,17 @@ Visit http://localhost:8000
 
 ```bash
 # List projects
-atlasui projects list
+atlascli projects list
 
 # List clusters
-atlasui clusters list <project-id>
+atlascli clusters list <project-id>
 
 # Get cluster details
-atlasui clusters get <project-id> <cluster-name>
+atlascli clusters get <project-id> <cluster-name>
 
 # See all commands
-atlasui --help
+atlascli --help
+atlascli --version
 ```
 
 ### Run Tests

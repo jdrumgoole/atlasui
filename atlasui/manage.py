@@ -14,6 +14,8 @@ import atexit
 from pathlib import Path
 from typing import Optional
 
+from atlasui import __version__
+
 # Configuration
 SERVER_MODULE = "atlasui.server"
 PID_FILE = Path("atlasui.pid")
@@ -235,7 +237,7 @@ def main() -> int:
 
     parser = argparse.ArgumentParser(
         description='AtlasUI Server Management',
-        epilog="""
+        epilog=f"""
 Environment Variables:
   HOST     Server host (default: 0.0.0.0)
   PORT     Server port (default: 8000)
@@ -251,8 +253,16 @@ Examples:
   inv stop
   inv restart
   inv status
+
+atlasui version {__version__}
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+
+    parser.add_argument(
+        '--version',
+        action='version',
+        version=f'atlasui {__version__}'
     )
 
     parser.add_argument(

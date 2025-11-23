@@ -180,19 +180,20 @@ atlasui stop
 
 ```bash
 # List all clusters
-atlasui clusters list <project-id>
+atlascli clusters list <project-id>
 
 # Get cluster details
-atlasui clusters get <project-id> <cluster-name>
+atlascli clusters get <project-id> <cluster-name>
 
 # Create a new cluster
-atlasui clusters create --name my-new-cluster --project-id <project-id>
+atlascli clusters create --name my-new-cluster --project-id <project-id>
 
 # List projects
-atlasui projects list
+atlascli projects list
 
-# View help
-atlasui --help
+# View help and version
+atlascli --help
+atlascli --version
 ```
 
 ## Development

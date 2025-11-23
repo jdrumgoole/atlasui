@@ -189,10 +189,10 @@ inv run
 
 ```bash
 # List projects using service account
-atlasui projects list
+atlascli projects list
 
 # Get cluster details
-atlasui clusters get <project-id> <cluster-name>
+atlascli clusters get <project-id> <cluster-name>
 ```
 
 ### Python Client

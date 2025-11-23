@@ -3,6 +3,7 @@ Main CLI application using Typer.
 """
 
 import typer
+from typing import Optional
 from rich.console import Console
 from rich.table import Table
 
@@ -11,8 +12,9 @@ from atlasui.cli import projects, clusters, alerts, backups
 
 # Create main app
 app = typer.Typer(
-    name="atlasui",
+    name="atlascli",
     help="MongoDB Atlas Administration CLI",
+    epilog=f"atlascli version {__version__}",
     add_completion=True,
 )
 
@@ -24,6 +26,28 @@ app.add_typer(projects.app, name="projects", help="Manage Atlas projects")
 app.add_typer(clusters.app, name="clusters", help="Manage Atlas clusters")
 app.add_typer(alerts.app, name="alerts", help="Manage Atlas alerts")
 app.add_typer(backups.app, name="backups", help="Manage Atlas backups")
+
+
+def version_callback(value: bool) -> None:
+    """Callback for --version flag."""
+    if value:
+        console.print(f"atlascli version {__version__}")
+        raise typer.Exit()
+
+
+@app.callback()
+def main(
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        "-v",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit",
+    )
+) -> None:
+    """MongoDB Atlas Administration CLI."""
+    pass
 
 
 @app.command()
