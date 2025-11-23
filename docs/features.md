@@ -29,9 +29,61 @@ The panel automatically expands when new operations are added and can be manuall
 
 The following long-running operations are managed through the queue:
 
-* **Create Cluster**: Creating new MongoDB clusters (M0, M10, M30, etc.)
+* **Create Cluster**: Creating new MongoDB clusters (M0, Flex, M10, M30, etc.)
 * **Delete Cluster**: Removing clusters from a project
 * **Delete Project**: Cascading deletion of projects with all associated clusters
+
+## Flex Cluster Support
+
+AtlasUI supports MongoDB Atlas's new Flex tier, which replaces the deprecated Serverless tier.
+
+### What is Flex?
+
+Flex clusters provide:
+
+* **Pay-per-use pricing**: Only pay for the operations and storage you actually use
+* **Auto-scaling**: Automatically scales resources based on workload demands
+* **Shared infrastructure**: Runs on TENANT provider with shared resources
+* **Cost-effective**: Ideal for development, testing, and variable workloads
+
+### Configuration
+
+Flex clusters use a specific configuration format:
+
+```json
+{
+    "name": "cluster-name",
+    "clusterType": "REPLICASET",
+    "providerSettings": {
+        "providerName": "TENANT",
+        "backingProviderName": "AWS",  // or GCP, AZURE
+        "regionName": "EU_WEST_1",
+        "instanceSizeName": "FLEX"
+    }
+}
+```
+
+### Creating Flex Clusters
+
+1. Navigate to the Clusters page
+2. Click "Create Cluster"
+3. Select a project
+4. Choose "Flex" from the instance size dropdown (under "Flex (Shared Tier)")
+5. Select your cloud provider (AWS, GCP, or Azure)
+6. Choose your region
+7. Select cluster type (REPLICASET or SHARDED)
+8. Click "Create Cluster"
+
+The cluster will be created using the TENANT provider model with the FLEX instance size.
+
+### Migration from Serverless
+
+If you were previously using Serverless clusters:
+
+* Flex provides the same pay-per-use model
+* Configuration format has changed from `serverlessSpec` to standard `providerSettings`
+* All Serverless references in AtlasUI have been updated to Flex
+* Tests and documentation reflect the new Flex tier
 
 ## Status-Based Polling
 
@@ -81,16 +133,31 @@ If a cluster deletion takes longer than 10 minutes, the system will:
 3. Suggest waiting a few more minutes before retrying
 4. Provide clear guidance on how to proceed
 
-## Exit Server Button
+## Exit Server Modal
 
-The web interface includes a convenient exit button in the navigation bar that:
+The web interface includes a convenient exit button in the navigation bar with an integrated shutdown confirmation modal:
 
-* Safely shuts down the AtlasUI server
-* Closes all active MongoDB sessions
-* Displays a shutdown confirmation page
-* Asks for confirmation before shutting down
+### Features
 
-This eliminates the need to find and kill the server process manually.
+* **Bootstrap Modal Confirmation**: Clean, professional modal dialog instead of browser alerts
+* **Detailed Information**: Clear explanation of what will happen during shutdown:
+  - Stop the web server
+  - Close all active MongoDB Atlas sessions
+  - Terminate all background operations
+* **Warning Design**: Red header with warning icon to indicate the serious action
+* **Visual Feedback**: Beautiful shutdown screen with gradient background and animations
+* **Smooth Transitions**: Graceful progression from "Shutting Down..." to "Server Stopped"
+
+### User Experience
+
+1. Click the Exit button in the navigation bar
+2. Modal appears with detailed shutdown information
+3. Choose to cancel or confirm shutdown
+4. On confirmation, see a purple gradient shutdown screen with spinner
+5. After shutdown completes, green checkmark confirms success
+6. Clean message indicates it's safe to close the browser window
+
+This eliminates the need to find and kill the server process manually while providing a polished, integrated user experience.
 
 ## Database-Themed Favicon
 

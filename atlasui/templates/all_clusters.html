@@ -272,8 +272,8 @@
                                     <optgroup label="Free Tier">
                                         <option value="M0">M0 - Free (512MB storage, shared CPU)</option>
                                     </optgroup>
-                                    <optgroup label="Serverless">
-                                        <option value="SERVERLESS">Serverless - Pay-per-use (auto-scaling)</option>
+                                    <optgroup label="Flex (Shared Tier)">
+                                        <option value="FLEX">Flex - Pay-per-use (auto-scaling shared infrastructure)</option>
                                     </optgroup>
                                     <optgroup label="Dedicated Clusters">
                                         <option value="M10">M10 - 2GB RAM</option>
@@ -288,7 +288,7 @@
                                         <option value="M300">M300 - 384GB RAM</option>
                                     </optgroup>
                                 </select>
-                                <div class="form-text">M0 is free tier. Serverless auto-scales. M10+ are dedicated clusters with fixed resources.</div>
+                                <div class="form-text">M0 is free tier. Flex auto-scales on shared infrastructure. M10+ are dedicated clusters with fixed resources.</div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -1238,17 +1238,16 @@ async function createCluster() {
     // Build cluster configuration based on instance type
     let clusterConfig;
 
-    if (instanceSize === 'SERVERLESS') {
+    if (instanceSize === 'FLEX') {
+        // Flex cluster configuration (replaces Serverless)
         clusterConfig = {
             name: clusterName,
+            clusterType: clusterType,
             providerSettings: {
-                providerName: "SERVERLESS"
-            },
-            serverlessSpec: {
-                providerSettings: {
-                    providerName: providerName,
-                    regionName: regionName
-                }
+                providerName: "TENANT",  // TENANT for shared infrastructure
+                backingProviderName: providerName,  // AWS, GCP, or AZURE
+                regionName: regionName,
+                instanceSizeName: "FLEX"  // New Flex tier
             }
         };
     } else if (instanceSize === 'M0') {
@@ -1282,7 +1281,7 @@ async function createCluster() {
         }
     }
 
-    if (mongoDBVersion && instanceSize !== 'SERVERLESS') {
+    if (mongoDBVersion && instanceSize !== 'FLEX') {
         clusterConfig.mongoDBMajorVersion = mongoDBVersion;
     }
 

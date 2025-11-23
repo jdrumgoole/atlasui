@@ -1,6 +1,6 @@
 [project]
 name = "atlasui"
-version = "0.1.7"
+version = "0.1.8"
 description = "User Interface for MongoDB Atlas - Web UI and CLI tool"
 readme = "README.md"
 authors = [

@@ -4,7 +4,7 @@ Playwright test for creating and deleting multiple cluster types.
 This test automates the full lifecycle:
 1. Creates a new project
 2. Creates M0 Free Tier cluster (US_EAST_1 - recommended for M0)
-3. Creates Serverless cluster (SKIPPED - configuration format under investigation)
+3. Creates Flex cluster (EU_WEST_1 - replaces deprecated Serverless)
 4. Creates M10 Dedicated cluster (EU_WEST_1)
 5. Deletes the project (which automatically deletes all associated clusters)
 
@@ -14,11 +14,10 @@ including the cascading deletion of all clusters within the project.
 IMPORTANT LIMITATIONS:
 - Only ONE M0 cluster is allowed per PROJECT. You can have multiple M0 clusters in
   an organization as long as they are in different projects.
-- M0 clusters use the TENANT provider with a backingProviderName instead of the
-  standard providerSettings configuration.
-- Serverless cluster creation is currently skipped due to unresolved API configuration
-  format. The correct providerSettings structure needs clarification from MongoDB Atlas
-  API documentation.
+- M0 and Flex clusters use the TENANT provider with a backingProviderName and
+  instanceSizeName instead of the standard providerSettings configuration.
+- Flex clusters replaced the deprecated Serverless tier and use the same shared
+  infrastructure model with pay-per-use pricing.
 """
 import pytest
 from playwright.sync_api import Page, expect
@@ -33,7 +32,7 @@ def test_create_project_and_clusters(page: Page):
     1. Navigate to the organizations page
     2. Create a new project
     3. Create an M0 cluster in US_EAST_1
-    4. Skip Serverless cluster (configuration format under investigation)
+    4. Create a Flex cluster in EU_WEST_1
     5. Create an M10 cluster in EU_WEST_1
     6. Delete the project (cascading delete of all clusters)
     7. Verify project and clusters are deleted
@@ -168,12 +167,24 @@ def test_create_project_and_clusters(page: Page):
     time.sleep(2)
 
     # =========================================================================
-    # STEP 4: Skip Serverless (configuration needs more investigation)
+    # STEP 4: Create Flex Cluster (replaces deprecated Serverless)
     # =========================================================================
     print("\n" + "="*80)
-    print("Skipping Serverless Cluster (configuration format under investigation)")
+    print("Creating Flex Cluster (pay-per-use shared infrastructure)")
     print("="*80)
-    print("Note: Serverless providerSettings format needs clarification from MongoDB Atlas API docs")
+
+    create_cluster(
+        page=page,
+        cluster_name=f"flex-cluster-{int(time.time())}",
+        project_name=project_name,
+        provider="AWS",
+        region="EU_WEST_1",
+        instance_size="FLEX",
+        cluster_type="REPLICASET"
+    )
+
+    print("\n11. Flex cluster creation initiated successfully")
+    time.sleep(2)
 
     # =========================================================================
     # STEP 5: Create M10 Dedicated Cluster
@@ -313,7 +324,7 @@ def create_cluster(page: Page, cluster_name: str, project_name: str,
         project_name: Project name to create cluster in
         provider: Cloud provider (AWS, GCP, AZURE)
         region: Region code (e.g., EU_WEST_1)
-        instance_size: Instance size (M0, SERVERLESS, M10, etc.)
+        instance_size: Instance size (M0, FLEX, M10, etc.)
         cluster_type: Cluster type (REPLICASET, SHARDED)
     """
     print(f"\nCreating cluster: {cluster_name}")
@@ -382,10 +393,9 @@ def create_cluster(page: Page, cluster_name: str, project_name: str,
     print(f"  - Selecting instance size: {instance_size}")
     page.select_option("#instanceSize", instance_size)
 
-    # Select cluster type (if not Serverless)
-    if instance_size != "SERVERLESS":
-        print(f"  - Selecting cluster type: {cluster_type}")
-        page.select_option("#clusterType", cluster_type)
+    # Select cluster type (all cluster types need this)
+    print(f"  - Selecting cluster type: {cluster_type}")
+    page.select_option("#clusterType", cluster_type)
 
     # Submit
     print("  - Submitting cluster creation form")
