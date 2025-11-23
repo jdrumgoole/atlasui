@@ -7,3 +7,17 @@
 - Keep the two cluster pages in sync as much as possible
 - when I say bump the version I always mean by a minor version unless there are breaking changes
 - You can only have one M0 cluster per organization
+- when I say make a release push everything including tags to github to trigger the release github action
+- when we push a tag always make a github release
+
+## Release Process Order
+When making a release, follow this exact order:
+1. Update documentation
+2. Run all tests
+3. Bump version in pyproject.toml
+4. Commit changes with detailed release notes
+5. Create git tag
+6. Build Python package locally (uv run python -m build)
+7. Build Sphinx documentation locally (cd docs && uv run sphinx-build -b html . _build/html)
+8. Push to GitHub (git push && git push --tags)
+9. Create GitHub Release with gh release create (this triggers the PyPI publish workflow)
