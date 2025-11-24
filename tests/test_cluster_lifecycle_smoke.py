@@ -14,7 +14,7 @@ import time
 
 
 @pytest.mark.integration
-def test_cluster_lifecycle_smoke(page: Page):
+def test_cluster_lifecycle_smoke(page: Page, atlasui_server):
     """
     Smoke test for cluster lifecycle infrastructure.
 

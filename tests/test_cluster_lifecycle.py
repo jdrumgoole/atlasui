@@ -512,7 +512,7 @@ def verify_project_deleted(page: Page, base_url: str, project_name: str) -> bool
 @pytest.mark.integration
 @pytest.mark.lifecycle
 @pytest.mark.m0
-def test_m0_cluster_lifecycle(page: Page):
+def test_m0_cluster_lifecycle(page: Page, atlasui_server):
     """
     Test M0 cluster full lifecycle with polling.
 
@@ -579,7 +579,7 @@ def test_m0_cluster_lifecycle(page: Page):
 @pytest.mark.integration
 @pytest.mark.lifecycle
 @pytest.mark.flex
-def test_flex_cluster_lifecycle(page: Page):
+def test_flex_cluster_lifecycle(page: Page, atlasui_server):
     """
     Test Flex cluster full lifecycle with polling.
 
@@ -646,7 +646,7 @@ def test_flex_cluster_lifecycle(page: Page):
 @pytest.mark.integration
 @pytest.mark.lifecycle
 @pytest.mark.m10
-def test_m10_cluster_lifecycle(page: Page):
+def test_m10_cluster_lifecycle(page: Page, atlasui_server):
     """
     Test M10 cluster full lifecycle with polling.
 

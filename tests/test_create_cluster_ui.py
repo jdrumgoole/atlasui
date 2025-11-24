@@ -8,7 +8,7 @@ from playwright.sync_api import Page, expect
 import json
 
 
-def test_create_cluster(page: Page):
+def test_create_cluster(page: Page, atlasui_server):
     """
     Test cluster creation through the UI.
 
