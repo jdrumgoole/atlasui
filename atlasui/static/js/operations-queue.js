@@ -571,20 +571,18 @@ class OperationQueueUI {
                     }
 
                     // Call loadClusters() if it exists (we're on the clusters page)
+                    // Only reload for CREATE operations - DELETE operations use optimistic removal
                     if (typeof window.loadClusters === 'function') {
-                        console.log(`Cluster operation ${operation.type} ${event}, refreshing cluster list...`);
+                        const createOperationTypes = ['create_cluster', 'create_flex_cluster'];
 
-                        // For completed operations and started delete operations, add a small delay and refresh twice
-                        // to ensure Atlas API has fully propagated the status change
-                        if (event === 'completed' || (event === 'started' && deleteOperationTypes.includes(operation.type))) {
-                            // Immediate refresh
+                        // Only reload for create operations (delete uses optimistic removal)
+                        if (event === 'completed' && createOperationTypes.includes(operation.type)) {
+                            console.log(`Cluster creation ${operation.type} completed, refreshing cluster list...`);
                             window.loadClusters();
-                            // Second refresh after 2 seconds to catch any delayed status updates
-                            setTimeout(() => {
-                                console.log(`Second refresh for ${operation.type} to ensure status is updated...`);
-                                window.loadClusters();
-                            }, 2000);
-                        } else {
+                        }
+                        // For started create operations, refresh to show CREATING status
+                        else if (event === 'started' && createOperationTypes.includes(operation.type)) {
+                            console.log(`Cluster creation ${operation.type} started, refreshing cluster list...`);
                             window.loadClusters();
                         }
                     }
