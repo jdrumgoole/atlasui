@@ -4,7 +4,7 @@ Tests for FastAPI routes.
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, AsyncMock
 
 from atlasui.server import app
 
@@ -32,9 +32,9 @@ def test_root_redirect():
 @patch('atlasui.api.projects.AtlasClient')
 def test_list_projects_api(mock_client_class, sample_projects_response):
     """Test list projects API endpoint."""
-    mock_client = Mock()
+    mock_client = AsyncMock()
     mock_client.list_projects.return_value = sample_projects_response
-    mock_client_class.return_value.__enter__.return_value = mock_client
+    mock_client_class.return_value.__aenter__.return_value = mock_client
 
     response = client.get("/api/projects/")
     assert response.status_code == 200
@@ -46,9 +46,9 @@ def test_list_projects_api(mock_client_class, sample_projects_response):
 @patch('atlasui.api.projects.AtlasClient')
 def test_get_project_api(mock_client_class, sample_project):
     """Test get project API endpoint."""
-    mock_client = Mock()
+    mock_client = AsyncMock()
     mock_client.get_project.return_value = sample_project
-    mock_client_class.return_value.__enter__.return_value = mock_client
+    mock_client_class.return_value.__aenter__.return_value = mock_client
 
     project_id = "5a0a1e7e0f2912c554080adc"
     response = client.get(f"/api/projects/{project_id}")
@@ -60,9 +60,9 @@ def test_get_project_api(mock_client_class, sample_project):
 @patch('atlasui.api.clusters.AtlasClient')
 def test_list_clusters_api(mock_client_class, sample_clusters_response):
     """Test list clusters API endpoint."""
-    mock_client = Mock()
+    mock_client = AsyncMock()
     mock_client.list_clusters.return_value = sample_clusters_response
-    mock_client_class.return_value.__enter__.return_value = mock_client
+    mock_client_class.return_value.__aenter__.return_value = mock_client
 
     project_id = "5a0a1e7e0f2912c554080adc"
     response = client.get(f"/api/clusters/{project_id}")
@@ -75,9 +75,9 @@ def test_list_clusters_api(mock_client_class, sample_clusters_response):
 @patch('atlasui.api.clusters.AtlasClient')
 def test_get_cluster_api(mock_client_class, sample_cluster):
     """Test get cluster API endpoint."""
-    mock_client = Mock()
+    mock_client = AsyncMock()
     mock_client.get_cluster.return_value = sample_cluster
-    mock_client_class.return_value.__enter__.return_value = mock_client
+    mock_client_class.return_value.__aenter__.return_value = mock_client
 
     project_id = "5a0a1e7e0f2912c554080adc"
     cluster_name = "test-cluster"
