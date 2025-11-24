@@ -14,6 +14,7 @@ Each test ensures operations complete by polling status until:
 import pytest
 from playwright.sync_api import Page, expect
 import time
+import requests
 
 
 def wait_for_cluster_creation(page: Page, cluster_name: str, timeout: int = 600) -> bool:
@@ -420,6 +421,94 @@ def delete_project(page: Page, base_url: str, project_name: str):
     print("  ✓ Project deletion completed")
 
 
+def verify_cluster_deleted(base_url: str, project_name: str, cluster_name: str) -> bool:
+    """
+    Verify that a cluster no longer exists by checking the API.
+
+    Args:
+        base_url: Base URL of the application
+        project_name: Name of the project (used for display)
+        cluster_name: Name of the cluster to verify
+
+    Returns:
+        bool: True if cluster is confirmed deleted, False otherwise
+    """
+    print("\n" + "="*80)
+    print(f"VERIFICATION: Checking cluster '{cluster_name}' is deleted")
+    print("="*80)
+
+    try:
+        # Get all clusters from the API
+        response = requests.get(f"{base_url}/api/all-clusters", timeout=10)
+
+        if response.status_code != 200:
+            print(f"  ⚠ Failed to fetch clusters: HTTP {response.status_code}")
+            return False
+
+        clusters = response.json()
+
+        # Check if cluster exists in the response
+        for cluster in clusters:
+            if cluster.get("name") == cluster_name:
+                print(f"  ✗ Cluster '{cluster_name}' still exists!")
+                print(f"    State: {cluster.get('stateName', 'UNKNOWN')}")
+                print(f"    Project: {cluster.get('projectName', 'UNKNOWN')}")
+                return False
+
+        print(f"  ✓ Cluster '{cluster_name}' confirmed deleted (not in API response)")
+        return True
+
+    except Exception as e:
+        print(f"  ⚠ Error verifying cluster deletion: {e}")
+        return False
+
+
+def verify_project_deleted(page: Page, base_url: str, project_name: str) -> bool:
+    """
+    Verify that a project no longer exists by checking the UI.
+
+    Args:
+        page: Playwright page object
+        base_url: Base URL of the application
+        project_name: Name of the project to verify
+
+    Returns:
+        bool: True if project is confirmed deleted, False otherwise
+    """
+    print("\n" + "="*80)
+    print(f"VERIFICATION: Checking project '{project_name}' is deleted")
+    print("="*80)
+
+    try:
+        # Navigate to organizations page
+        print("1. Navigating to organizations page")
+        page.goto(f"{base_url}/organizations")
+        page.wait_for_load_state("domcontentloaded")
+        time.sleep(1)
+
+        # Click first organization to navigate to projects
+        print("2. Navigating to projects page")
+        projects_link = page.locator('a[href*="/organizations/"][href*="/projects"]').first
+        projects_link.click()
+        page.wait_for_load_state("domcontentloaded")
+        time.sleep(2)
+
+        # Check if project exists in the list
+        print(f"3. Checking if project '{project_name}' exists")
+        project_row = page.locator(f'tr:has-text("{project_name}")').first
+
+        if project_row.count() > 0:
+            print(f"  ✗ Project '{project_name}' still exists in the list!")
+            return False
+
+        print(f"  ✓ Project '{project_name}' confirmed deleted (not in UI)")
+        return True
+
+    except Exception as e:
+        print(f"  ⚠ Error verifying project deletion: {e}")
+        return False
+
+
 @pytest.mark.integration
 @pytest.mark.lifecycle
 @pytest.mark.m0
@@ -474,8 +563,16 @@ def test_m0_cluster_lifecycle(page: Page):
     # Delete project
     delete_project(page, base_url, project_name)
 
+    # Verify all resources are deleted
+    cluster_deleted = verify_cluster_deleted(base_url, project_name, cluster_name)
+    assert cluster_deleted, f"Verification failed: Cluster '{cluster_name}' still exists"
+
+    project_deleted = verify_project_deleted(page, base_url, project_name)
+    assert project_deleted, f"Verification failed: Project '{project_name}' still exists"
+
     print("\n" + "="*80)
     print("✓ M0 Cluster Lifecycle Test Completed Successfully")
+    print("✓ All resources verified deleted")
     print("="*80 + "\n")
 
 
@@ -533,8 +630,16 @@ def test_flex_cluster_lifecycle(page: Page):
     # Delete project
     delete_project(page, base_url, project_name)
 
+    # Verify all resources are deleted
+    cluster_deleted = verify_cluster_deleted(base_url, project_name, cluster_name)
+    assert cluster_deleted, f"Verification failed: Cluster '{cluster_name}' still exists"
+
+    project_deleted = verify_project_deleted(page, base_url, project_name)
+    assert project_deleted, f"Verification failed: Project '{project_name}' still exists"
+
     print("\n" + "="*80)
     print("✓ Flex Cluster Lifecycle Test Completed Successfully")
+    print("✓ All resources verified deleted")
     print("="*80 + "\n")
 
 
@@ -592,8 +697,16 @@ def test_m10_cluster_lifecycle(page: Page):
     # Delete project
     delete_project(page, base_url, project_name)
 
+    # Verify all resources are deleted
+    cluster_deleted = verify_cluster_deleted(base_url, project_name, cluster_name)
+    assert cluster_deleted, f"Verification failed: Cluster '{cluster_name}' still exists"
+
+    project_deleted = verify_project_deleted(page, base_url, project_name)
+    assert project_deleted, f"Verification failed: Project '{project_name}' still exists"
+
     print("\n" + "="*80)
     print("✓ M10 Cluster Lifecycle Test Completed Successfully")
+    print("✓ All resources verified deleted")
     print("="*80 + "\n")
 
 
