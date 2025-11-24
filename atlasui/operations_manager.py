@@ -546,9 +546,20 @@ class OperationManager:
                         try:
                             await client.delete_cluster(project_id, cluster_name)
                         except Exception as e:
+                            error_msg = str(e)
+                            # If cluster is already being deleted, that's fine - continue
+                            if "already been requested for deletion" in error_msg:
+                                logger.info(f"Cluster {cluster_name} is already being deleted, skipping...")
                             # If it fails with Flex cluster error, try Flex deletion
-                            if "Flex cluster" in str(e) and "cannot be used in the Cluster API" in str(e):
-                                await client.delete_flex_cluster(project_id, cluster_name)
+                            elif "Flex cluster" in error_msg and "cannot be used in the Cluster API" in error_msg:
+                                try:
+                                    await client.delete_flex_cluster(project_id, cluster_name)
+                                except Exception as flex_e:
+                                    # If Flex deletion also fails with "already requested", that's also fine
+                                    if "already been requested for deletion" in str(flex_e):
+                                        logger.info(f"Flex cluster {cluster_name} is already being deleted, skipping...")
+                                    else:
+                                        raise
                             else:
                                 raise
 
