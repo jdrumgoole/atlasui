@@ -196,6 +196,35 @@ let projects = [];
 document.addEventListener('DOMContentLoaded', function() {
     loadProjects();
     document.getElementById('refreshBtn').addEventListener('click', loadProjects);
+
+    // Listen for operation completion events and reload projects list
+    // Poll for operationQueueUI to be initialized
+    let pollAttempts = 0;
+    const maxPollAttempts = 20; // 10 seconds max
+    const pollInterval = setInterval(() => {
+        pollAttempts++;
+        console.log(`[Projects] Polling for operationQueueUI (attempt ${pollAttempts}/${maxPollAttempts})`);
+
+        if (window.operationQueueUI && window.operationQueueUI.manager) {
+            clearInterval(pollInterval);
+            console.log('[Projects] operationQueueUI found, registering listener');
+
+            window.operationQueueUI.manager.addListener((event, operation) => {
+                console.log('[Projects] SSE event received:', event, 'type:', operation.type);
+
+                // Only reload for create_project (delete already removes the item optimistically)
+                if (event === 'completed' && operation.type === 'create_project') {
+                    console.log(`[Projects] ${operation.type} completed, reloading projects list`);
+                    loadProjects();
+                }
+            });
+
+            console.log('[Projects] Event listener registered successfully');
+        } else if (pollAttempts >= maxPollAttempts) {
+            clearInterval(pollInterval);
+            console.error('[Projects] Failed to find operationQueueUI after', maxPollAttempts, 'attempts');
+        }
+    }, 500);
 });
 
 async function loadProjects() {
@@ -923,10 +952,12 @@ async function showClusterDetails(clusterId, projectId) {
 // Delete project functionality
 let deleteProjectId = null;
 let deleteProjectNameExpected = null;
+let deleteProjectClusters = [];
 
 async function confirmDeleteProject(projectId, projectName) {
     deleteProjectId = projectId;
     deleteProjectNameExpected = projectName;
+    deleteProjectClusters = [];
 
     // Reset modal state
     document.getElementById('deleteProjectName').textContent = projectName;
@@ -940,53 +971,66 @@ async function confirmDeleteProject(projectId, projectName) {
     const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
     modal.show();
 
-    // Load clusters and databases
+    // Check with backend if confirmation is required (will return cluster list)
     try {
-        const clustersResponse = await fetch(`/api/clusters/${projectId}`);
-        const clustersData = await clustersResponse.ok ? await clustersResponse.json() : { results: [] };
-        const clusters = clustersData.results || [];
+        const response = await fetch(`/api/projects/${projectId}`, {
+            method: 'DELETE'
+        });
 
-        // Build clusters list with database info
-        const clustersContainer = document.getElementById('deleteClustersContainer');
-
-        if (clusters.length === 0) {
-            clustersContainer.innerHTML = '<p class="text-muted">No clusters in this project</p>';
-        } else {
-            let html = '<ul class="list-group">';
-            for (const cluster of clusters) {
-                html += `
-                    <li class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <strong><i class="bi bi-hdd-rack"></i> ${cluster.name}</strong>
-                                <div class="small text-muted">
-                                    ${cluster.clusterType || 'N/A'} •
-                                    ${cluster.mongoDBVersion || 'N/A'} •
-                                    ${cluster.providerSettings?.providerName || 'N/A'}
-                                </div>
-                                <div class="small text-muted mt-1">
-                                    <strong>Note:</strong> All databases and collections in this cluster will be permanently deleted
-                                </div>
-                            </div>
-                            <span class="badge ${getStatusBadgeClass(cluster.stateName)}">${cluster.stateName || 'UNKNOWN'}</span>
-                        </div>
-                    </li>
-                `;
-            }
-            html += '</ul>';
-            clustersContainer.innerHTML = html;
+        if (!response.ok) {
+            throw new Error(`Failed to check project deletion requirements: ${response.statusText}`);
         }
 
-        // Hide loading, show resources
-        document.getElementById('deleteResourcesLoading').classList.add('d-none');
-        document.getElementById('deleteResourcesList').classList.remove('d-none');
+        const data = await response.json();
+
+        // Always show confirmation (backend always requires it now)
+        if (data.confirmation_required) {
+            const clusters = data.clusters || [];
+            deleteProjectClusters = clusters;
+
+            // Build clusters list
+            const clustersContainer = document.getElementById('deleteClustersContainer');
+
+            if (clusters.length === 0) {
+                clustersContainer.innerHTML = '<div class="alert alert-info"><i class="bi bi-info-circle"></i> No clusters in this project</div>';
+            } else {
+                let html = '<div class="alert alert-warning mb-3">';
+                html += `<i class="bi bi-exclamation-triangle"></i> <strong>Warning:</strong> ${data.message}`;
+                html += '</div><ul class="list-group">';
+
+                for (const cluster of clusters) {
+                    html += `
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong><i class="bi bi-hdd-rack"></i> ${cluster.name}</strong>
+                                    <div class="small text-muted">
+                                        ${cluster.type || 'N/A'} • ${cluster.state || 'UNKNOWN'}
+                                    </div>
+                                    <div class="small text-muted mt-1">
+                                        <strong>Note:</strong> All databases and collections in this cluster will be permanently deleted
+                                    </div>
+                                </div>
+                                <span class="badge ${getStatusBadgeClass(cluster.state)}">${cluster.state || 'UNKNOWN'}</span>
+                            </div>
+                        </li>
+                    `;
+                }
+                html += '</ul>';
+                clustersContainer.innerHTML = html;
+            }
+
+            // Hide loading, show resources
+            document.getElementById('deleteResourcesLoading').classList.add('d-none');
+            document.getElementById('deleteResourcesList').classList.remove('d-none');
+        }
 
     } catch (err) {
-        console.error('Error loading project resources:', err);
+        console.error('Error checking project deletion:', err);
         document.getElementById('deleteResourcesLoading').innerHTML = `
             <div class="alert alert-warning">
                 <i class="bi bi-exclamation-triangle"></i>
-                Failed to load project resources. You can still proceed with deletion.
+                Failed to load project resources. ${err.message}
             </div>
         `;
         document.getElementById('deleteResourcesList').classList.remove('d-none');
@@ -1018,147 +1062,60 @@ document.addEventListener('DOMContentLoaded', function() {
 async function executeDeleteProject() {
     if (!deleteProjectId) return;
 
-    // Capture project info for the queue
     const projectId = deleteProjectId;
     const projectName = deleteProjectNameExpected;
 
-    // Close the modal immediately
+    // Close the modal
     const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
     modal.hide();
 
-    // Queue the deletion operation
-    window.operationQueue.enqueue({
-        type: 'delete_project',
-        name: `Delete Project: ${projectName}`,
-        metadata: {
-            projectId: projectId,
-            projectName: projectName
-        },
-        execute: async (updateProgress) => {
-            try {
-                // Step 1: Get all clusters in the project
-                updateProgress('Loading clusters...');
-                const clustersResponse = await fetch(`/api/clusters/${projectId}`);
-                const clustersData = await clustersResponse.ok ? await clustersResponse.json() : { results: [] };
-                const clusters = clustersData.results || [];
+    try {
+        console.log('executeDeleteProject called for:', projectId, projectName);
 
-                // Step 2: Delete all clusters first
-                if (clusters.length > 0) {
-                    console.log(`Deleting ${clusters.length} cluster(s) before deleting project...`);
+        // Call DELETE endpoint with confirmed=true
+        const response = await fetch(`/api/projects/${projectId}?confirmed=true`, {
+            method: 'DELETE'
+        });
 
-                    for (let i = 0; i < clusters.length; i++) {
-                        const cluster = clusters[i];
-                        updateProgress(`Deleting clusters (${i + 1}/${clusters.length})...`);
+        console.log('Delete response status:', response.status, response.ok);
 
-                        try {
-                            const deleteClusterResponse = await fetch(`/api/clusters/${projectId}/${cluster.name}`, {
-                                method: 'DELETE'
-                            });
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('Delete failed:', error);
+            alert(`Failed to delete project: ${error.detail || response.statusText}`);
+            return;
+        }
 
-                            if (!deleteClusterResponse.ok) {
-                                console.warn(`Failed to delete cluster ${cluster.name}, continuing anyway...`);
-                            } else {
-                                console.log(`Cluster ${cluster.name} deletion initiated`);
-                            }
-                        } catch (clusterErr) {
-                            console.warn(`Error deleting cluster ${cluster.name}:`, clusterErr);
-                        }
-                    }
+        const data = await response.json();
+        console.log('Delete response data:', data);
 
-                    // Step 2.5: Poll cluster statuses until all are deleted
-                    updateProgress('Waiting for cluster deletions to complete...');
+        if (data.success) {
+            const clusterCount = deleteProjectClusters.length;
+            const message = clusterCount > 0
+                ? `Project "${projectName}" and ${clusterCount} cluster(s) deletion queued`
+                : `Project "${projectName}" deletion queued`;
 
-                    const maxWaitTime = 600000; // 10 minutes max wait (cluster deletion can be very slow)
-                    const pollInterval = 5000; // Check every 5 seconds
-                    const startTime = Date.now();
+            console.log(message);
 
-                    // Track clusters we're waiting for
-                    const clusterNamesToDelete = clustersData.results.map(c => c.name);
-                    const stillDeleting = new Set(clusterNamesToDelete);
-
-                    while (stillDeleting.size > 0 && (Date.now() - startTime) < maxWaitTime) {
-                        await new Promise(resolve => setTimeout(resolve, pollInterval));
-
-                        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-
-                        // Check status of each remaining cluster
-                        for (const clusterName of Array.from(stillDeleting)) {
-                            try {
-                                const statusResponse = await fetch(`/api/clusters/${projectId}/${clusterName}`);
-
-                                if (statusResponse.status === 404) {
-                                    // Cluster is fully deleted
-                                    console.log(`Cluster ${clusterName} has been deleted`);
-                                    stillDeleting.delete(clusterName);
-                                } else if (statusResponse.ok) {
-                                    const clusterData = await statusResponse.json();
-                                    const stateName = clusterData.stateName || 'UNKNOWN';
-
-                                    console.log(`Cluster ${clusterName} status: ${stateName} (${elapsed}s elapsed)`);
-
-                                    // If cluster is no longer in DELETING state and still exists, something unexpected happened
-                                    if (stateName !== 'DELETING') {
-                                        console.warn(`Cluster ${clusterName} is in unexpected state: ${stateName}`);
-                                        // We'll keep waiting - it might transition back to DELETING or get deleted
-                                    }
-                                } else {
-                                    console.warn(`Error checking status for cluster ${clusterName}: ${statusResponse.status}`);
-                                }
-                            } catch (err) {
-                                console.warn(`Error polling cluster ${clusterName}:`, err);
-                            }
-                        }
-
-                        if (stillDeleting.size > 0) {
-                            const statusList = Array.from(stillDeleting).join(', ');
-                            updateProgress(`Waiting for ${stillDeleting.size} cluster(s) to be deleted: ${statusList} (${elapsed}s elapsed)`);
-                        }
-                    }
-
-                    if (stillDeleting.size > 0) {
-                        const clusterNames = Array.from(stillDeleting).join(', ');
-                        throw new Error(`Timeout waiting for cluster deletions. The following cluster(s) are still being deleted: ${clusterNames}. Please wait a few more minutes and try deleting the project again.`);
-                    }
-
-                    console.log('All clusters have been deleted successfully');
-                }
-
-                // Step 3: Now delete the project
-                updateProgress('Deleting project...');
-                const response = await fetch(`/api/projects/${projectId}`, {
-                    method: 'DELETE'
-                });
-
-                if (!response.ok) {
-                    let errorMessage = 'Failed to delete project';
-
-                    // Special handling for 409 Conflict (clusters still exist)
-                    if (response.status === 409) {
-                        errorMessage = 'Cannot delete project - clusters are still being deleted by MongoDB Atlas. This can take 5-10 minutes. Please wait and try again later.';
-                    } else {
-                        try {
-                            const error = await response.json();
-                            errorMessage = error.detail || errorMessage;
-                        } catch (parseError) {
-                            errorMessage = `${errorMessage}: ${response.statusText || response.status}`;
-                        }
-                    }
-                    throw new Error(errorMessage);
-                }
-
-                const result = await response.json();
-
-                // Reload projects list
-                loadProjects();
-
-                return { success: true, projectName: projectName };
-
-            } catch (err) {
-                console.error('Error deleting project:', err);
-                throw err;
+            // Immediately remove project from the list to prevent duplicate deletion attempts
+            console.log('Removing project from list:', projectId);
+            console.log('Projects before removal:', projects.length);
+            const projectIndex = projects.findIndex(p => p.id === projectId);
+            console.log('Project index found:', projectIndex);
+            if (projectIndex !== -1) {
+                projects.splice(projectIndex, 1);
+                console.log('Projects after removal:', projects.length);
+                renderProjects();
+                console.log('Projects re-rendered');
+            } else {
+                console.warn('Project not found in projects array:', projectId);
             }
         }
-    });
+
+    } catch (err) {
+        console.error('Error deleting project:', err);
+        alert(`Error deleting project: ${err.message}`);
+    }
 }
 
 // Create project functionality
@@ -1232,6 +1189,8 @@ async function executeCreateProject() {
 
         const result = await response.json();
 
+        console.log('Create project response:', result);
+
         // Close modal
         const modal = bootstrap.Modal.getInstance(document.getElementById('createProjectModal'));
         modal.hide();
@@ -1244,14 +1203,14 @@ async function executeCreateProject() {
         successAlert.className = 'alert alert-success alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3';
         successAlert.style.zIndex = '9999';
         successAlert.innerHTML = `
-            <i class="bi bi-check-circle"></i> Project "${projectName}" has been created successfully
+            <i class="bi bi-check-circle"></i> Project "${projectName}" creation queued - check Operations panel for progress
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         `;
         document.body.appendChild(successAlert);
         setTimeout(() => successAlert.remove(), 5000);
 
-        // Reload projects list
-        loadProjects();
+        // Don't reload immediately - wait for operation completion
+        // The project list will auto-refresh when the create operation completes
 
     } catch (err) {
         console.error('Error creating project:', err);

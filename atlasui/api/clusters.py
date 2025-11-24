@@ -8,11 +8,17 @@ from pydantic import BaseModel
 from pymongo import MongoClient
 from pymongo.errors import OperationFailure, ServerSelectionTimeoutError, ConnectionFailure, ConfigurationError
 import urllib.parse
+import time
 
 from atlasui.client import AtlasClient
 from atlasui.session_manager import get_session_manager
+from atlasui.operations_manager import get_operation_manager, OperationType
 
 router = APIRouter()
+
+# Simple cache for cluster listings (TTL: 30 seconds)
+_cluster_cache = {}
+_cache_ttl = 30  # seconds
 
 
 class ClusterLoginRequest(BaseModel):
@@ -224,7 +230,7 @@ async def list_clusters(
     items_per_page: int = Query(100, ge=1, le=500, description="Items per page"),
 ) -> Dict[str, Any]:
     """
-    List all clusters in a project.
+    List all clusters in a project (regular clusters only, not Flex).
 
     Args:
         project_id: MongoDB Atlas project ID
@@ -234,13 +240,71 @@ async def list_clusters(
     Returns:
         Clusters list with pagination info
     """
+    # Check cache
+    cache_key = f"clusters_{project_id}_{page_num}_{items_per_page}"
+    now = time.time()
+
+    if cache_key in _cluster_cache:
+        cached_data, cached_time = _cluster_cache[cache_key]
+        if now - cached_time < _cache_ttl:
+            return cached_data
+
+    # Fetch from Atlas API
     try:
-        with AtlasClient() as client:
-            return client.list_clusters(
+        async with AtlasClient() as client:
+            result = await client.list_clusters(
                 project_id=project_id,
                 page_num=page_num,
                 items_per_page=items_per_page
             )
+
+        # Cache the result
+        _cluster_cache[cache_key] = (result, now)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{project_id}/flex/list")
+async def list_flex_clusters(
+    project_id: str,
+    page_num: int = Query(1, ge=1, description="Page number"),
+    items_per_page: int = Query(100, ge=1, le=500, description="Items per page"),
+) -> Dict[str, Any]:
+    """
+    List all Flex clusters in a project.
+
+    As of January 2025, Flex clusters are in a separate API endpoint.
+
+    Args:
+        project_id: MongoDB Atlas project ID
+        page_num: Page number (1-indexed)
+        items_per_page: Number of items per page (max 500)
+
+    Returns:
+        Flex clusters list with pagination info
+    """
+    # Check cache
+    cache_key = f"flex_{project_id}_{page_num}_{items_per_page}"
+    now = time.time()
+
+    if cache_key in _cluster_cache:
+        cached_data, cached_time = _cluster_cache[cache_key]
+        if now - cached_time < _cache_ttl:
+            return cached_data
+
+    # Fetch from Atlas API
+    try:
+        async with AtlasClient() as client:
+            result = await client.list_flex_clusters(
+                project_id=project_id,
+                page_num=page_num,
+                items_per_page=items_per_page
+            )
+
+        # Cache the result
+        _cluster_cache[cache_key] = (result, now)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -258,8 +322,8 @@ async def get_cluster(project_id: str, cluster_name: str) -> Dict[str, Any]:
         Cluster details
     """
     try:
-        with AtlasClient() as client:
-            return client.get_cluster(project_id, cluster_name)
+        async with AtlasClient() as client:
+            return await client.get_cluster(project_id, cluster_name)
     except Exception as e:
         if "404" in str(e):
             raise HTTPException(
@@ -277,29 +341,78 @@ async def create_cluster(
     """
     Create a new cluster in a project.
 
+    This endpoint handles M0, M10+, and other regular clusters.
+    For Flex clusters, use the dedicated /flex endpoint.
+
+    This endpoint queues the operation and returns immediately.
+    Use the /api/operations/stream endpoint to monitor progress.
+
     Args:
         project_id: MongoDB Atlas project ID
         cluster_config: Cluster configuration
 
     Returns:
-        Created cluster details
+        Operation ID and initial status
     """
-    try:
-        with AtlasClient() as client:
-            return client.create_cluster(project_id, cluster_config)
-    except Exception as e:
-        error_msg = str(e)
-        # Try to extract status code from error message if present
-        if "400" in error_msg or "Bad Request" in error_msg:
-            raise HTTPException(status_code=400, detail=error_msg)
-        elif "401" in error_msg or "Unauthorized" in error_msg:
-            raise HTTPException(status_code=401, detail=error_msg)
-        elif "403" in error_msg or "Forbidden" in error_msg:
-            raise HTTPException(status_code=403, detail=error_msg)
-        elif "404" in error_msg or "Not Found" in error_msg:
-            raise HTTPException(status_code=404, detail=error_msg)
-        else:
-            raise HTTPException(status_code=500, detail=error_msg)
+    cluster_name = cluster_config.get("name", "Unknown")
+
+    # Queue the operation
+    manager = get_operation_manager()
+    operation_id = manager.queue_operation(
+        type=OperationType.CREATE_CLUSTER,
+        name=f"Creating cluster: {cluster_name}",
+        metadata={
+            "project_id": project_id,
+            "cluster_config": cluster_config
+        }
+    )
+
+    return {
+        "operation_id": operation_id,
+        "message": f"Cluster creation queued for {cluster_name}",
+        "cluster_name": cluster_name
+    }
+
+
+@router.post("/{project_id}/flex")
+async def create_flex_cluster(
+    project_id: str,
+    cluster_config: Dict[str, Any] = Body(..., description="Flex cluster configuration")
+) -> Dict[str, Any]:
+    """
+    Create a new Flex cluster in a project.
+
+    As of January 2025, Flex clusters use a dedicated API endpoint
+    (/api/atlas/v2/groups/{groupId}/flexClusters).
+
+    This endpoint queues the operation and returns immediately.
+    Use the /api/operations/stream endpoint to monitor progress.
+
+    Args:
+        project_id: MongoDB Atlas project ID
+        cluster_config: Flex cluster configuration
+
+    Returns:
+        Operation ID and initial status
+    """
+    cluster_name = cluster_config.get("name", "Unknown")
+
+    # Queue the operation
+    manager = get_operation_manager()
+    operation_id = manager.queue_operation(
+        type=OperationType.CREATE_FLEX_CLUSTER,
+        name=f"Creating Flex cluster: {cluster_name}",
+        metadata={
+            "project_id": project_id,
+            "cluster_config": cluster_config
+        }
+    )
+
+    return {
+        "operation_id": operation_id,
+        "message": f"Flex cluster creation queued for {cluster_name}",
+        "cluster_name": cluster_name
+    }
 
 
 @router.patch("/{project_id}/{cluster_name}")
@@ -320,8 +433,8 @@ async def update_cluster(
         Updated cluster details
     """
     try:
-        with AtlasClient() as client:
-            return client.update_cluster(project_id, cluster_name, cluster_config)
+        async with AtlasClient() as client:
+            return await client.update_cluster(project_id, cluster_name, cluster_config)
     except Exception as e:
         if "404" in str(e):
             raise HTTPException(
@@ -334,25 +447,36 @@ async def update_cluster(
 @router.delete("/{project_id}/{cluster_name}")
 async def delete_cluster(project_id: str, cluster_name: str) -> Dict[str, Any]:
     """
-    Delete a cluster.
+    Delete a cluster (automatically detects if it's a Flex cluster).
+
+    This endpoint queues the operation and returns immediately.
+    The operation manager will automatically detect whether this is a
+    regular cluster or Flex cluster and use the appropriate API endpoint.
+    Use the /api/operations/stream endpoint to monitor progress.
 
     Args:
         project_id: MongoDB Atlas project ID
         cluster_name: Cluster name
 
     Returns:
-        Deletion confirmation
+        Operation ID and initial status
     """
-    try:
-        with AtlasClient() as client:
-            return client.delete_cluster(project_id, cluster_name)
-    except Exception as e:
-        if "404" in str(e):
-            raise HTTPException(
-                status_code=404,
-                detail=f"Cluster {cluster_name} not found in project {project_id}"
-            )
-        raise HTTPException(status_code=500, detail=str(e))
+    # Queue the operation - the operation manager will handle detection
+    manager = get_operation_manager()
+    operation_id = manager.queue_operation(
+        type=OperationType.DELETE_CLUSTER,
+        name=f"Deleting cluster: {cluster_name}",
+        metadata={
+            "project_id": project_id,
+            "cluster_name": cluster_name
+        }
+    )
+
+    return {
+        "operation_id": operation_id,
+        "message": f"Cluster deletion queued for {cluster_name}",
+        "cluster_name": cluster_name
+    }
 
 
 @router.get("/session/status")

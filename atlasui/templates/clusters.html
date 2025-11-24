@@ -360,30 +360,75 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="alert alert-warning">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    <strong>Warning:</strong> This action cannot be undone!
-                </div>
-                <p>You are about to permanently delete the cluster:</p>
-                <p class="text-center"><strong id="deleteClusterName"></strong></p>
-                <p class="text-danger"><strong>All data in this cluster will be lost permanently.</strong></p>
-                <p class="text-muted small">Please ensure you have backups of any important data before proceeding.</p>
+                <!-- Confirmation Form -->
+                <div id="deleteClusterForm">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <strong>Warning:</strong> This action cannot be undone!
+                    </div>
+                    <p>You are about to permanently delete the cluster:</p>
+                    <p class="text-center"><strong id="deleteClusterName"></strong></p>
+                    <p class="text-danger"><strong>All data in this cluster will be lost permanently.</strong></p>
+                    <p class="text-muted small">Please ensure you have backups of any important data before proceeding.</p>
 
-                <div class="mb-3 mt-3">
-                    <label for="confirmClusterName" class="form-label">
-                        Type the cluster name to confirm deletion:
-                    </label>
-                    <input type="text" class="form-control" id="confirmClusterName"
-                           placeholder="Enter cluster name">
+                    <div class="mb-3 mt-3">
+                        <label for="confirmClusterName" class="form-label">
+                            Type the cluster name to confirm deletion:
+                        </label>
+                        <input type="text" class="form-control" id="confirmClusterName"
+                               placeholder="Enter cluster name">
+                    </div>
+
+                    <div id="deleteClusterError" class="alert alert-danger d-none mt-3"></div>
                 </div>
 
-                <div id="deleteClusterError" class="alert alert-danger d-none mt-3"></div>
+                <!-- Deletion Progress -->
+                <div id="deleteClusterProgress" class="d-none">
+                    <div class="text-center mb-3">
+                        <div class="spinner-border text-danger mb-3" role="status" style="width: 3rem; height: 3rem;">
+                            <span class="visually-hidden">Deleting...</span>
+                        </div>
+                        <h5 class="text-danger">Deleting Cluster</h5>
+                        <p id="deleteClusterProgressText">Initiating cluster deletion...</p>
+                    </div>
+
+                    <div class="mb-3">
+                        <span id="deleteClusterStatus" class="badge bg-warning text-dark fs-6 py-2 px-3">
+                            <i class="bi bi-hourglass-split"></i> DELETING
+                        </span>
+                    </div>
+
+                    <div class="progress mb-3" style="height: 25px;">
+                        <div id="deleteClusterProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-danger"
+                             role="progressbar" style="width: 10%">
+                            <span class="fw-bold">Deleting...</span>
+                        </div>
+                    </div>
+
+                    <div class="text-muted small">
+                        <p id="deleteStep1" class="mb-1"><i class="bi bi-circle"></i> Shutting down cluster</p>
+                        <p id="deleteStep2" class="mb-1"><i class="bi bi-circle"></i> Removing resources</p>
+                        <p id="deleteStep3" class="mb-1"><i class="bi bi-circle"></i> Finalizing deletion</p>
+                    </div>
+                </div>
+
+                <!-- Deletion Success -->
+                <div id="deleteClusterSuccess" class="alert alert-success d-none mt-3">
+                    <div class="text-center">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                        <h5 class="mt-2">Cluster Deleted Successfully</h5>
+                        <p>The cluster has been permanently removed.</p>
+                    </div>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <div class="modal-footer" id="deleteClusterFooter">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="cancelDeleteBtn">Cancel</button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteClusterBtn" disabled>
                     <i class="bi bi-trash"></i> Delete Cluster
                 </button>
+            </div>
+            <div class="modal-footer d-none" id="deleteClusterCompleteFooter">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -518,10 +563,30 @@ async function loadClusters() {
             `<a href="/organizations/${encodeURIComponent(targetOrg.name)}/projects">${targetOrg.name}</a>`;
         document.getElementById('projectNameBreadcrumb').textContent = targetProject.name;
 
-        // Fetch clusters for this project
+        // Fetch both regular clusters AND Flex clusters
         const clustersResponse = await fetch(`/api/clusters/${targetProject.id}?itemsPerPage=500`);
         if (!clustersResponse.ok) throw new Error('Failed to fetch clusters');
         const clustersData = await clustersResponse.json();
+
+        // Fetch Flex clusters (separate endpoint as of Jan 2025)
+        let flexClustersData = { results: [] };
+        try {
+            const flexResponse = await fetch(`/api/clusters/${targetProject.id}/flex/list?itemsPerPage=500`);
+            if (flexResponse.ok) {
+                flexClustersData = await flexResponse.json();
+                console.log(`Found ${(flexClustersData.results || []).length} Flex clusters`);
+            }
+        } catch (err) {
+            console.warn('Failed to fetch Flex clusters:', err);
+        }
+
+        // Combine regular and Flex clusters
+        const allClusters = [
+            ...(clustersData.results || []),
+            ...(flexClustersData.results || [])
+        ];
+
+        console.log(`Total clusters: ${allClusters.length} (${(clustersData.results || []).length} regular + ${(flexClustersData.results || []).length} Flex)`);
 
         // Fetch users for this project
         let projectUsers = [];
@@ -536,7 +601,7 @@ async function loadClusters() {
         }
 
         // Add project name and users to each cluster
-        clusters = (clustersData.results || []).map(c => ({
+        clusters = allClusters.map(c => ({
             ...c,
             projectName: targetProject.name,
             projectId: targetProject.id,
@@ -593,7 +658,7 @@ function renderClusters() {
                     <i class="bi bi-box-arrow-in-right"></i> Login
                 </button>
                 <button class="btn btn-sm btn-outline-danger"
-                        onclick="showDeleteClusterConfirmation('${cluster.name}', '${cluster.projectId}')">
+                        onclick="showDeleteClusterConfirmation('${cluster.name}', '${cluster.projectId}', '${cluster.providerSettings?.providerName || ''}', '${cluster.providerSettings?.instanceSizeName || ''}')">
                     <i class="bi bi-trash"></i> Delete
                 </button>
             </td>
@@ -1332,14 +1397,13 @@ async function createCluster() {
 
         if (instanceSize === 'FLEX') {
             // Flex cluster configuration (replaces Serverless)
+            // Note: Flex clusters don't use clusterType field
             clusterConfig = {
                 name: clusterName,
-                clusterType: clusterType,
                 providerSettings: {
-                    providerName: "TENANT",  // TENANT for shared infrastructure
+                    providerName: "FLEX",  // FLEX provider for new Flex clusters
                     backingProviderName: providerName,  // AWS, GCP, or AZURE
-                    regionName: regionName,
-                    instanceSizeName: "FLEX"  // New Flex tier
+                    regionName: regionName
                 }
             };
         } else if (instanceSize === 'M0') {
@@ -1380,7 +1444,14 @@ async function createCluster() {
         // Log the configuration being sent (for debugging)
         console.log('Creating cluster with config:', JSON.stringify(clusterConfig, null, 2));
 
-        const response = await fetch(`/api/clusters/${projectId}`, {
+        // Use different endpoint for Flex clusters (as of January 2025)
+        const endpoint = instanceSize === 'FLEX'
+            ? `/api/clusters/${projectId}/flex`
+            : `/api/clusters/${projectId}`;
+
+        console.log('Using endpoint:', endpoint);
+
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -1409,6 +1480,8 @@ async function createCluster() {
         }
 
         const newCluster = await response.json();
+        console.log('Cluster creation response:', newCluster);
+        console.log(`New cluster ${clusterName} initial state: ${newCluster.stateName || 'UNKNOWN'}`);
 
         // Hide the form and show success message with progress tracking
         document.getElementById('createClusterForm').style.display = 'none';
@@ -1465,13 +1538,21 @@ async function createCluster() {
         `;
         successDiv.classList.remove('d-none');
 
-        // Start polling cluster status
-        pollClusterCreationStatus(projectId, clusterName);
+        // Start polling cluster status (pass instance size to know which endpoint to poll)
+        pollClusterCreationStatus(projectId, clusterName, instanceSize);
 
     } catch (err) {
         console.error('Error creating cluster:', err);
+
+        // Show the form again if it was hidden
+        document.getElementById('createClusterForm').style.display = 'block';
+
+        // Display error message
         errorDiv.textContent = err.message;
         errorDiv.classList.remove('d-none');
+
+        // Hide success message if it was shown
+        successDiv.classList.add('d-none');
     } finally {
         // Re-enable button
         submitBtn.disabled = false;
@@ -1480,7 +1561,7 @@ async function createCluster() {
 }
 
 // Poll cluster creation status
-async function pollClusterCreationStatus(projectId, clusterName) {
+async function pollClusterCreationStatus(projectId, clusterName, instanceSize) {
     const maxAttempts = 60; // Poll for up to 10 minutes (60 * 10 seconds)
     let attempts = 0;
 
@@ -1488,19 +1569,31 @@ async function pollClusterCreationStatus(projectId, clusterName) {
         attempts++;
 
         try {
-            // Fetch cluster status
-            const response = await fetch(`/api/clusters/${projectId}`);
+            // Fetch cluster status from the correct endpoint
+            // Flex clusters are in a separate endpoint
+            const endpoint = instanceSize === 'FLEX'
+                ? `/api/clusters/${projectId}/flex/list`
+                : `/api/clusters/${projectId}`;
+
+            console.log(`Polling cluster status from: ${endpoint}`);
+
+            const response = await fetch(endpoint);
             if (!response.ok) {
                 throw new Error('Failed to fetch cluster status');
             }
 
             const data = await response.json();
+            console.log(`Polling response for ${clusterName}:`, data);
+
             const cluster = (data.results || []).find(c => c.name === clusterName);
 
             if (!cluster) {
+                console.warn(`Cluster ${clusterName} not found in response. Stopping polling.`);
                 clearInterval(pollInterval);
                 return;
             }
+
+            console.log(`Cluster ${clusterName} status: ${cluster.stateName}`);
 
             // Update progress bar based on time elapsed
             const progressBar = document.getElementById('clusterCreationProgress');
@@ -1636,16 +1729,30 @@ async function pollClusterCreationStatus(projectId, clusterName) {
 }
 
 // Delete Cluster functionality
-let deleteClusterData = { name: '', projectId: '' };
+let deleteClusterData = { name: '', projectId: '', providerName: '', instanceSizeName: '' };
 
-function showDeleteClusterConfirmation(clusterName, projectId) {
-    deleteClusterData = { name: clusterName, projectId: projectId };
+function showDeleteClusterConfirmation(clusterName, projectId, providerName, instanceSizeName) {
+    deleteClusterData = {
+        name: clusterName,
+        projectId: projectId,
+        providerName: providerName || '',
+        instanceSizeName: instanceSizeName || ''
+    };
+
+    console.log('Showing delete confirmation for cluster:', deleteClusterData);
 
     // Set cluster name in modal
     document.getElementById('deleteClusterName').textContent = clusterName;
     document.getElementById('confirmClusterName').value = '';
     document.getElementById('deleteClusterError').classList.add('d-none');
     document.getElementById('confirmDeleteClusterBtn').disabled = true;
+
+    // Reset modal state
+    document.getElementById('deleteClusterForm').style.display = 'block';
+    document.getElementById('deleteClusterProgress').classList.add('d-none');
+    document.getElementById('deleteClusterSuccess').classList.add('d-none');
+    document.getElementById('deleteClusterFooter').classList.remove('d-none');
+    document.getElementById('deleteClusterCompleteFooter').classList.add('d-none');
 
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('deleteClusterModal'));
@@ -1761,6 +1868,8 @@ async function deleteCluster() {
     deleteBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Deleting...';
 
     try {
+        console.log('Initiating deletion for cluster:', deleteClusterData);
+
         const response = await fetch(`/api/clusters/${deleteClusterData.projectId}/${deleteClusterData.name}`, {
             method: 'DELETE'
         });
@@ -1770,22 +1879,176 @@ async function deleteCluster() {
             throw new Error(errorData.detail || `Failed to delete cluster (${response.status})`);
         }
 
-        // Close modal
-        bootstrap.Modal.getInstance(document.getElementById('deleteClusterModal')).hide();
+        console.log('Deletion request successful, starting to poll for completion');
 
-        // Show success and reload
-        alert(`Cluster "${deleteClusterData.name}" has been deleted successfully.`);
-        loadClusters();
+        // Hide confirmation form and show progress
+        document.getElementById('deleteClusterForm').style.display = 'none';
+        document.getElementById('deleteClusterProgress').classList.remove('d-none');
+        document.getElementById('deleteClusterFooter').classList.add('d-none');
+
+        // Start polling for deletion completion
+        pollClusterDeletionStatus(
+            deleteClusterData.projectId,
+            deleteClusterData.name,
+            deleteClusterData.providerName,
+            deleteClusterData.instanceSizeName
+        );
 
     } catch (err) {
         console.error('Error deleting cluster:', err);
         errorDiv.textContent = err.message;
         errorDiv.classList.remove('d-none');
-    } finally {
+
         // Re-enable button
         deleteBtn.disabled = false;
         deleteBtn.innerHTML = '<i class="bi bi-trash"></i> Delete Cluster';
     }
+}
+
+async function pollClusterDeletionStatus(projectId, clusterName, providerName, instanceSizeName) {
+    const maxAttempts = 60; // Max 10 minutes (60 * 10 seconds)
+    let attempts = 0;
+
+    console.log(`Starting deletion polling for ${clusterName} (provider: ${providerName}, instanceSize: ${instanceSizeName})`);
+
+    const pollInterval = setInterval(async () => {
+        attempts++;
+
+        try {
+            // Determine if this is a Flex cluster based on provider name or instance size
+            const isFlexCluster = providerName === 'FLEX' || instanceSizeName === 'FLEX';
+
+            // Fetch cluster list from the correct endpoint
+            const endpoint = isFlexCluster
+                ? `/api/clusters/${projectId}/flex/list`
+                : `/api/clusters/${projectId}`;
+
+            console.log(`Polling deletion status (attempt ${attempts}) from: ${endpoint}`);
+
+            const response = await fetch(endpoint);
+            if (!response.ok) {
+                console.warn('Failed to fetch cluster list during deletion polling');
+                // If we can't fetch, assume it might be deleted
+                if (attempts > 3) {
+                    // After a few attempts, if we can't fetch, assume deletion completed
+                    clearInterval(pollInterval);
+                    showDeletionComplete(clusterName);
+                }
+                return;
+            }
+
+            const data = await response.json();
+            console.log(`Polling response for ${clusterName}:`, data);
+
+            // Look for the cluster in the results
+            const cluster = (data.results || []).find(c => c.name === clusterName);
+
+            if (!cluster) {
+                // Cluster not found - deletion complete!
+                console.log(`Cluster ${clusterName} not found in list - deletion complete!`);
+                clearInterval(pollInterval);
+                showDeletionComplete(clusterName);
+                return;
+            }
+
+            console.log(`Cluster ${clusterName} status: ${cluster.stateName}`);
+
+            // Update progress bar based on time elapsed
+            const progressBar = document.getElementById('deleteClusterProgressBar');
+            const progressPercent = Math.min(10 + (attempts * 1.5), 95);
+            if (progressBar) {
+                progressBar.style.width = `${progressPercent}%`;
+
+                // Update progress text based on percentage
+                if (progressPercent < 40) {
+                    progressBar.innerHTML = '<span class="fw-bold">Shutting down...</span>';
+                } else if (progressPercent < 70) {
+                    progressBar.innerHTML = '<span class="fw-bold">Removing resources...</span>';
+                } else {
+                    progressBar.innerHTML = '<span class="fw-bold">Finalizing...</span>';
+                }
+            }
+
+            // Animate step indicators
+            if (attempts > 3) {
+                const step1 = document.getElementById('deleteStep1');
+                if (step1) step1.innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Shutting down cluster';
+            }
+            if (attempts > 10) {
+                const step2 = document.getElementById('deleteStep2');
+                if (step2) step2.innerHTML = '<i class="bi bi-arrow-right-circle-fill text-primary"></i> Removing resources';
+            }
+
+            // Update status badge
+            const statusBadge = document.getElementById('deleteClusterStatus');
+            if (statusBadge) {
+                statusBadge.className = 'badge fs-6 py-2 px-3';
+                switch (cluster.stateName) {
+                    case 'DELETING':
+                        statusBadge.classList.add('bg-warning', 'text-dark');
+                        statusBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> DELETING';
+                        break;
+                    case 'DELETED':
+                        statusBadge.classList.add('bg-danger');
+                        statusBadge.innerHTML = '<i class="bi bi-x-circle-fill"></i> DELETED';
+                        break;
+                    default:
+                        statusBadge.classList.add('bg-secondary');
+                        statusBadge.innerHTML = '<i class="bi bi-question-circle-fill"></i> ' + (cluster.stateName || 'UNKNOWN');
+                }
+            }
+
+            // Check if deletion took too long
+            if (attempts >= maxAttempts) {
+                console.warn(`Deletion polling timeout after ${attempts} attempts`);
+                clearInterval(pollInterval);
+
+                // Show a warning but still mark as complete
+                document.getElementById('deleteClusterProgressText').textContent =
+                    'Deletion is taking longer than expected. The cluster may still be deleting in the background.';
+                setTimeout(() => {
+                    showDeletionComplete(clusterName);
+                }, 3000);
+            }
+
+        } catch (err) {
+            console.error('Error polling cluster deletion status:', err);
+
+            // If we get an error after a few attempts, assume deletion completed
+            if (attempts > 3) {
+                clearInterval(pollInterval);
+                showDeletionComplete(clusterName);
+            }
+        }
+
+    }, 10000); // Poll every 10 seconds
+}
+
+function showDeletionComplete(clusterName) {
+    console.log(`Showing deletion complete for ${clusterName}`);
+
+    // Update all steps to complete
+    document.getElementById('deleteStep1').innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Shutting down cluster';
+    document.getElementById('deleteStep2').innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Removing resources';
+    document.getElementById('deleteStep3').innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Finalizing deletion';
+
+    // Update progress bar to 100%
+    const progressBar = document.getElementById('deleteClusterProgressBar');
+    if (progressBar) {
+        progressBar.style.width = '100%';
+        progressBar.innerHTML = '<span class="fw-bold">Complete!</span>';
+        progressBar.classList.remove('progress-bar-animated');
+    }
+
+    // Hide progress, show success
+    setTimeout(() => {
+        document.getElementById('deleteClusterProgress').classList.add('d-none');
+        document.getElementById('deleteClusterSuccess').classList.remove('d-none');
+        document.getElementById('deleteClusterCompleteFooter').classList.remove('d-none');
+
+        // Reload clusters list
+        loadClusters();
+    }, 1500);
 }
 
 // Add event listeners
@@ -1833,7 +2096,12 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('confirmClusterName').value = '';
         document.getElementById('deleteClusterError').classList.add('d-none');
         document.getElementById('confirmDeleteClusterBtn').disabled = true;
-        deleteClusterData = { name: '', projectId: '' };
+        document.getElementById('deleteClusterForm').style.display = 'block';
+        document.getElementById('deleteClusterProgress').classList.add('d-none');
+        document.getElementById('deleteClusterSuccess').classList.add('d-none');
+        document.getElementById('deleteClusterFooter').classList.remove('d-none');
+        document.getElementById('deleteClusterCompleteFooter').classList.add('d-none');
+        deleteClusterData = { name: '', projectId: '', providerName: '', instanceSizeName: '' };
     });
 });
 </script>

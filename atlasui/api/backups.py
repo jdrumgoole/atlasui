@@ -23,8 +23,8 @@ async def list_snapshots(project_id: str, cluster_name: str) -> Dict[str, Any]:
         Snapshots list
     """
     try:
-        with AtlasClient() as client:
-            return client.get(
+        async with AtlasClient() as client:
+            return await client.get(
                 f"/groups/{project_id}/clusters/{cluster_name}/backup/snapshots"
             )
     except Exception as e:
@@ -44,8 +44,8 @@ async def get_backup_schedule(project_id: str, cluster_name: str) -> Dict[str, A
         Backup schedule configuration
     """
     try:
-        with AtlasClient() as client:
-            return client.get(
+        async with AtlasClient() as client:
+            return await client.get(
                 f"/groups/{project_id}/clusters/{cluster_name}/backup/schedule"
             )
     except Exception as e:

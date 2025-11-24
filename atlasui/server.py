@@ -11,8 +11,9 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 
 from atlasui.config import settings
-from atlasui.api import projects, clusters, alerts, backups, users, pages, organizations, databases, server, setup
+from atlasui.api import projects, clusters, alerts, backups, users, pages, organizations, databases, server, setup, operations
 from atlasui.session_manager import get_session_manager
+from atlasui.operations_manager import get_operation_manager
 
 
 # Background task for cleaning up expired sessions
@@ -38,6 +39,11 @@ async def lifespan(app: FastAPI):
     # Startup
     print("Starting AtlasUI server...")
     print("Initializing MongoDB session manager...")
+    print("Starting operation manager...")
+
+    # Start operation manager
+    operation_manager = get_operation_manager()
+    await operation_manager.start()
 
     # Start background cleanup task
     cleanup_task = asyncio.create_task(cleanup_sessions_task())
@@ -46,6 +52,10 @@ async def lifespan(app: FastAPI):
 
     # Shutdown
     print("Shutting down AtlasUI server...")
+
+    # Stop operation manager
+    print("Stopping operation manager...")
+    await operation_manager.stop()
 
     # Cancel cleanup task
     cleanup_task.cancel()
@@ -97,6 +107,7 @@ app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(backups.router, prefix="/api/backups", tags=["Backups"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(databases.router, prefix="/api/databases", tags=["Databases"])
+app.include_router(operations.router, prefix="/api/operations", tags=["Operations"])
 app.include_router(server.router, prefix="/api/server", tags=["Server"])
 
 # Include page routers

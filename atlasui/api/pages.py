@@ -79,8 +79,8 @@ async def organization_projects(request: Request, org_id_or_name: str):
 async def projects_redirect(request: Request):
     """Redirect to the first organization's projects page."""
     try:
-        with AtlasClient() as client:
-            orgs_data = client.list_organizations(page_num=1, items_per_page=1)
+        async with AtlasClient() as client:
+            orgs_data = await client.list_organizations(page_num=1, items_per_page=1)
             orgs = orgs_data.get("results", [])
             if orgs:
                 first_org = orgs[0]

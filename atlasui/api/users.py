@@ -37,8 +37,8 @@ async def list_users(project_id: str) -> Dict[str, Any]:
         Database users list
     """
     try:
-        with AtlasClient() as client:
-            return client.get(f"/groups/{project_id}/databaseUsers")
+        async with AtlasClient() as client:
+            return await client.get(f"/groups/{project_id}/databaseUsers")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -55,8 +55,8 @@ async def list_database_users(project_id: str) -> Dict[str, Any]:
         Database users list
     """
     try:
-        with AtlasClient() as client:
-            return client.get(f"/groups/{project_id}/databaseUsers")
+        async with AtlasClient() as client:
+            return await client.get(f"/groups/{project_id}/databaseUsers")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -73,8 +73,8 @@ async def list_api_keys(project_id: str) -> Dict[str, Any]:
         API keys list
     """
     try:
-        with AtlasClient() as client:
-            return client.get(f"/groups/{project_id}/apiKeys")
+        async with AtlasClient() as client:
+            return await client.get(f"/groups/{project_id}/apiKeys")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -109,8 +109,8 @@ async def create_database_user(
             ]
         }
 
-        with AtlasClient() as client:
-            return client.post(f"/groups/{project_id}/databaseUsers", json=payload)
+        async with AtlasClient() as client:
+            return await client.post(f"/groups/{project_id}/databaseUsers", json=payload)
     except Exception as e:
         error_msg = str(e)
         if "409" in error_msg or "DUPLICATE" in error_msg.upper():

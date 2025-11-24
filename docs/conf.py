@@ -16,7 +16,7 @@ extensions = [
     'sphinx.ext.napoleon',
     'sphinx.ext.viewcode',
     'sphinx.ext.intersphinx',
-    'sphinx_autodoc_typehints',
+    # 'sphinx_autodoc_typehints',  # Temporarily disabled - install with: uv pip install sphinx-autodoc-typehints
     'myst_parser',
 ]
 

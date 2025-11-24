@@ -26,7 +26,7 @@ async def create_organization(
         Created organization details
     """
     try:
-        with AtlasClient() as client:
+        async with AtlasClient() as client:
             payload = {
                 "name": name,
             }
@@ -35,7 +35,7 @@ async def create_organization(
 
             # Try to get more detailed error info
             try:
-                return client.post("/orgs", json=payload)
+                return await client.post("/orgs", json=payload)
             except Exception as inner_e:
                 # Try to extract and parse the error response
                 error_msg = str(inner_e)
@@ -90,8 +90,8 @@ async def list_organizations(
         Organizations list response
     """
     try:
-        with AtlasClient() as client:
-            return client.list_organizations(
+        async with AtlasClient() as client:
+            return await client.list_organizations(
                 page_num=page_num,
                 items_per_page=items_per_page
             )
@@ -111,8 +111,8 @@ async def get_organization(org_id: str) -> Dict[str, Any]:
         Organization details
     """
     try:
-        with AtlasClient() as client:
-            return client.get_organization(org_id)
+        async with AtlasClient() as client:
+            return await client.get_organization(org_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -135,8 +135,8 @@ async def list_organization_projects(
         Projects list response for the organization
     """
     try:
-        with AtlasClient() as client:
-            return client.list_organization_projects(
+        async with AtlasClient() as client:
+            return await client.list_organization_projects(
                 org_id=org_id,
                 page_num=page_num,
                 items_per_page=items_per_page

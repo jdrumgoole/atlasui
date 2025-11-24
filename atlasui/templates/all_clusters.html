@@ -222,7 +222,11 @@
             </div>
             <div class="modal-body">
                 <div id="createClusterError" class="alert alert-danger d-none"></div>
-                <div id="createClusterSuccess" class="alert alert-success d-none"></div>
+
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    The cluster creation will be queued and processed in the background. You can track its progress in the Operations panel at the bottom of the screen.
+                </div>
 
                 <form id="createClusterForm">
                     <div class="mb-3">
@@ -358,6 +362,11 @@
                 <p class="text-danger"><strong>All data in this cluster will be lost permanently.</strong></p>
                 <p class="text-muted small">Please ensure you have backups of any important data before proceeding.</p>
 
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i>
+                    The deletion will be queued and processed in the background. You can track its progress in the Operations panel at the bottom of the screen.
+                </div>
+
                 <div class="mb-3 mt-3">
                     <label for="confirmClusterName" class="form-label">
                         Type the cluster name to confirm deletion:
@@ -455,6 +464,28 @@
 
 <script>
 let clusters = [];
+// Track clusters currently being deleted (key: "projectId:clusterName")
+const deletingClusters = new Set();
+
+// Global function to mark cluster as being deleted
+window.markClusterDeleting = function(projectId, clusterName) {
+    const key = `${projectId}:${clusterName}`;
+    deletingClusters.add(key);
+    console.log(`Marked cluster as deleting: ${key}`);
+};
+
+// Global function to unmark cluster as being deleted
+window.unmarkClusterDeleting = function(projectId, clusterName) {
+    const key = `${projectId}:${clusterName}`;
+    deletingClusters.delete(key);
+    console.log(`Unmarked cluster as deleting: ${key}`);
+};
+
+// Global function to check if cluster is being deleted
+window.isClusterDeleting = function(projectId, clusterName) {
+    const key = `${projectId}:${clusterName}`;
+    return deletingClusters.has(key);
+};
 
 document.addEventListener('DOMContentLoaded', function() {
     loadClusters();
@@ -470,52 +501,73 @@ async function loadClusters() {
     error.classList.add('d-none');
     table.classList.add('d-none');
 
+    const startTime = performance.now();
+    console.log('[TIMING] Starting cluster load...');
+
     try {
         // Fetch all organizations
+        const orgStart = performance.now();
         const orgsResponse = await fetch('/api/organizations/?itemsPerPage=500');
         if (!orgsResponse.ok) throw new Error('Failed to fetch organizations');
         const orgsData = await orgsResponse.json();
+        console.log(`[TIMING] Organizations fetched in ${(performance.now() - orgStart).toFixed(0)}ms`);
 
-        // Fetch all projects and clusters for each organization
-        const allClusters = [];
-        for (let org of orgsData.results || []) {
+        // Fetch all projects in parallel
+        const projectPromises = (orgsData.results || []).map(async (org) => {
             const projectsResponse = await fetch(`/api/organizations/${org.id}/projects?itemsPerPage=500`);
-            if (projectsResponse.ok) {
-                const projectsData = await projectsResponse.json();
+            if (!projectsResponse.ok) return [];
+            const projectsData = await projectsResponse.json();
+            return (projectsData.results || []).map(project => ({
+                ...project,
+                orgName: org.name,
+                orgId: org.id
+            }));
+        });
 
-                for (let project of projectsData.results || []) {
-                    // Fetch clusters for each project
-                    const clustersResponse = await fetch(`/api/clusters/${project.id}?itemsPerPage=500`);
-                    if (clustersResponse.ok) {
-                        const clustersData = await clustersResponse.json();
+        const projectArrays = await Promise.all(projectPromises);
+        const allProjects = projectArrays.flat();
+        console.log(`[TIMING] All projects fetched in ${(performance.now() - startTime).toFixed(0)}ms (${allProjects.length} projects)`);
 
-                        // Fetch users for this project
-                        let projectUsers = [];
-                        try {
-                            const usersResponse = await fetch(`/api/users/${project.id}`);
-                            if (usersResponse.ok) {
-                                const usersData = await usersResponse.json();
-                                projectUsers = usersData.results || [];
-                            }
-                        } catch (err) {
-                            console.warn(`Failed to fetch users for project ${project.id}:`, err);
-                        }
+        // Fetch clusters and users for all projects in parallel
+        const clusterStart = performance.now();
+        const clusterPromises = allProjects.map(async (project) => {
+            // Fetch regular clusters, Flex clusters, and users in parallel for this project
+            const [regularClusters, flexClusters, projectUsers] = await Promise.all([
+                // Regular clusters
+                fetch(`/api/clusters/${project.id}?itemsPerPage=500`)
+                    .then(r => r.ok ? r.json() : { results: [] })
+                    .then(data => data.results || [])
+                    .catch(() => []),
 
-                        // Add organization, project, and user info to each cluster
-                        (clustersData.results || []).forEach(cluster => {
-                            cluster.orgName = org.name;
-                            cluster.orgId = org.id;
-                            cluster.projectName = project.name;
-                            cluster.projectId = project.id;
-                            cluster.users = projectUsers;
-                            allClusters.push(cluster);
-                        });
-                    }
-                }
-            }
-        }
+                // Flex clusters
+                fetch(`/api/clusters/${project.id}/flex/list?itemsPerPage=500`)
+                    .then(r => r.ok ? r.json() : { results: [] })
+                    .then(data => data.results || [])
+                    .catch(() => []),
 
-        clusters = allClusters;
+                // Users
+                fetch(`/api/users/${project.id}`)
+                    .then(r => r.ok ? r.json() : { results: [] })
+                    .then(data => data.results || [])
+                    .catch(() => [])
+            ]);
+
+            // Combine and annotate clusters
+            const projectClusters = [...regularClusters, ...flexClusters];
+            return projectClusters.map(cluster => ({
+                ...cluster,
+                orgName: project.orgName,
+                orgId: project.orgId,
+                projectName: project.name,
+                projectId: project.id,
+                users: projectUsers
+            }));
+        });
+
+        const clusterArrays = await Promise.all(clusterPromises);
+        clusters = clusterArrays.flat();
+        console.log(`[TIMING] All clusters fetched in ${(performance.now() - clusterStart).toFixed(0)}ms (${clusters.length} clusters)`);
+        console.log(`[TIMING] TOTAL load time: ${(performance.now() - startTime).toFixed(0)}ms`);
 
         renderClusters();
         loading.classList.add('d-none');
@@ -540,7 +592,10 @@ function renderClusters() {
 
     clusters.forEach(cluster => {
         const row = document.createElement('tr');
-        const statusClass = getStatusBadgeClass(cluster.stateName);
+        // Override status if cluster is being deleted
+        const isDeleting = window.isClusterDeleting(cluster.projectId, cluster.name);
+        const displayStatus = isDeleting ? 'DELETING' : (cluster.stateName || 'UNKNOWN');
+        const statusClass = getStatusBadgeClass(displayStatus);
         const users = cluster.users || [];
 
         row.innerHTML = `
@@ -559,7 +614,7 @@ function renderClusters() {
                     <i class="bi bi-folder"></i> ${cluster.projectName}
                 </a>
             </td>
-            <td><span class="badge ${statusClass}">${cluster.stateName || 'UNKNOWN'}</span></td>
+            <td><span class="badge ${statusClass}">${displayStatus}</span></td>
             <td>
                 <a href="/clusters/${encodeURIComponent(cluster.name)}/databases" class="text-decoration-none">
                     ${cluster.clusterType || 'N/A'}
@@ -577,7 +632,7 @@ function renderClusters() {
                     <i class="bi bi-box-arrow-in-right"></i> Login
                 </button>
                 <button class="btn btn-sm btn-outline-danger"
-                        onclick="showDeleteClusterConfirmation('${cluster.name}', '${cluster.projectId}')">
+                        onclick="showDeleteClusterConfirmation('${cluster.name}', '${cluster.projectId}', '${cluster.providerSettings?.providerName || ''}', '${cluster.providerSettings?.instanceSizeName || ''}')">
                     <i class="bi bi-trash"></i> Delete
                 </button>
             </td>
@@ -1208,7 +1263,6 @@ async function showCreateClusterModal() {
     // Reset form and messages
     document.getElementById('createClusterForm').reset();
     document.getElementById('createClusterError').classList.add('d-none');
-    document.getElementById('createClusterSuccess').classList.add('d-none');
 
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('createClusterModal'));
@@ -1240,40 +1294,60 @@ async function createCluster() {
 
     if (instanceSize === 'FLEX') {
         // Flex cluster configuration (replaces Serverless)
+        // Note: Flex clusters don't use clusterType field
         clusterConfig = {
             name: clusterName,
-            clusterType: clusterType,
             providerSettings: {
-                providerName: "TENANT",  // TENANT for shared infrastructure
+                providerName: "FLEX",  // FLEX provider for new Flex clusters
                 backingProviderName: providerName,  // AWS, GCP, or AZURE
-                regionName: regionName,
-                instanceSizeName: "FLEX"  // New Flex tier
+                regionName: regionName
             }
         };
     } else if (instanceSize === 'M0') {
+        // M0 (free tier) uses replicationSpecs format in Atlas API v2
         clusterConfig = {
             name: clusterName,
-            clusterType: clusterType,
-            providerSettings: {
-                providerName: "TENANT",
-                backingProviderName: providerName,
-                regionName: regionName,
-                instanceSizeName: instanceSize
-            },
-            mongoDBMajorVersion: mongoDBVersion || "7.0",
-            numShards: 1,
-            replicationFactor: 3,
-            diskSizeGB: 0.5
+            clusterType: "REPLICASET",
+            replicationSpecs: [
+                {
+                    regionConfigs: [
+                        {
+                            providerName: "TENANT",
+                            backingProviderName: providerName,
+                            regionName: regionName,
+                            priority: 7,
+                            electableSpecs: {
+                                instanceSize: "M0"
+                            }
+                        }
+                    ]
+                }
+            ]
         };
+
+        if (mongoDBVersion) {
+            clusterConfig.mongoDBMajorVersion = mongoDBVersion;
+        }
     } else {
+        // M10+ dedicated clusters use replicationSpecs
         clusterConfig = {
             name: clusterName,
             clusterType: clusterType,
-            providerSettings: {
-                providerName: providerName,
-                regionName: regionName,
-                instanceSizeName: instanceSize
-            }
+            replicationSpecs: [
+                {
+                    regionConfigs: [
+                        {
+                            providerName: providerName,
+                            regionName: regionName,
+                            priority: 7,
+                            electableSpecs: {
+                                instanceSize: instanceSize,
+                                nodeCount: 3  // Standard 3-node replica set
+                            }
+                        }
+                    ]
+                }
+            ]
         };
 
         if (enableBackup) {
@@ -1288,201 +1362,76 @@ async function createCluster() {
     // Close the modal immediately
     bootstrap.Modal.getInstance(document.getElementById('createClusterModal')).hide();
 
-    // Queue the creation operation
-    window.operationQueue.enqueue({
-        type: 'create_cluster',
-        name: `Create Cluster: ${clusterName} (${instanceSize})`,
-        metadata: {
-            clusterName: clusterName,
-            projectId: projectId,
-            instanceSize: instanceSize,
-            provider: providerName,
-            region: regionName
-        },
-        execute: async (updateProgress) => {
+    try {
+        console.log('Creating cluster with config:', JSON.stringify(clusterConfig, null, 2));
+
+        // Use different endpoint for Flex clusters (as of January 2025)
+        const endpoint = instanceSize === 'FLEX'
+            ? `/api/clusters/${projectId}/flex`
+            : `/api/clusters/${projectId}`;
+
+        console.log('Using endpoint:', endpoint);
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(clusterConfig)
+        });
+
+        if (!response.ok) {
+            let errorMessage = `Failed to create cluster (${response.status})`;
             try {
-                updateProgress('Submitting cluster creation request...');
-                console.log('Creating cluster with config:', JSON.stringify(clusterConfig, null, 2));
-
-                const response = await fetch(`/api/clusters/${projectId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(clusterConfig)
-                });
-
-                if (!response.ok) {
-                    let errorMessage = `Failed to create cluster (${response.status})`;
-                    try {
-                        const errorData = await response.json();
-                        console.error('Cluster creation error:', errorData);
-                        if (errorData.detail) {
-                            errorMessage = errorData.detail;
-                        } else if (errorData.error) {
-                            errorMessage = errorData.error;
-                        } else if (errorData.message) {
-                            errorMessage = errorData.message;
-                        }
-                    } catch (e) {
-                        console.error('Error parsing error response:', e);
-                    }
-                    throw new Error(errorMessage);
+                const errorData = await response.json();
+                console.error('Cluster creation error:', errorData);
+                if (errorData.detail) {
+                    errorMessage = errorData.detail;
+                } else if (errorData.error) {
+                    errorMessage = errorData.error;
+                } else if (errorData.message) {
+                    errorMessage = errorData.message;
                 }
-
-                const newCluster = await response.json();
-                updateProgress('Cluster creation initiated successfully');
-
-                // Reload clusters list
-                loadClusters();
-
-                return { success: true, clusterName: clusterName };
-
-            } catch (err) {
-                console.error('Error creating cluster:', err);
-                throw err;
-            }
-        }
-    });
-}
-
-async function pollClusterCreationStatus(projectId, clusterName) {
-    const maxAttempts = 60;
-    let attempts = 0;
-
-    const pollInterval = setInterval(async () => {
-        attempts++;
-
-        try {
-            const response = await fetch(`/api/clusters/${projectId}`);
-            if (!response.ok) throw new Error('Failed to fetch cluster status');
-
-            const data = await response.json();
-            const cluster = (data.results || []).find(c => c.name === clusterName);
-
-            if (!cluster) {
-                clearInterval(pollInterval);
-                return;
+            } catch (e) {
+                console.error('Error parsing error response:', e);
             }
 
-            const progressBar = document.getElementById('clusterCreationProgress');
-            const progressPercent = Math.min(10 + (attempts * 1.5), 95);
-            if (progressBar) {
-                progressBar.style.width = `${progressPercent}%`;
-                if (progressPercent < 30) {
-                    progressBar.innerHTML = '<span class="fw-bold">Setting up...</span>';
-                } else if (progressPercent < 60) {
-                    progressBar.innerHTML = '<span class="fw-bold">Provisioning...</span>';
-                } else if (progressPercent < 90) {
-                    progressBar.innerHTML = '<span class="fw-bold">Configuring...</span>';
-                } else {
-                    progressBar.innerHTML = '<span class="fw-bold">Almost ready...</span>';
-                }
-            }
-
-            if (attempts > 5) {
-                const step1 = document.getElementById('step-provisioning');
-                if (step1) step1.innerHTML = '<i class="bi bi-arrow-right-circle-fill text-primary"></i> Provisioning resources';
-            }
-            if (attempts > 15) {
-                const step2 = document.getElementById('step-configuring');
-                if (step2) step2.innerHTML = '<i class="bi bi-arrow-right-circle-fill text-primary"></i> Configuring MongoDB';
-            }
-            if (attempts > 30) {
-                const step3 = document.getElementById('step-ready');
-                if (step3) step3.innerHTML = '<i class="bi bi-arrow-right-circle-fill text-primary"></i> Finalizing deployment';
-            }
-
-            const statusBadge = document.getElementById('clusterCreationStatus');
-            if (statusBadge) {
-                statusBadge.className = 'badge fs-6 py-2 px-3';
-                switch (cluster.stateName) {
-                    case 'IDLE':
-                        statusBadge.classList.add('bg-success');
-                        statusBadge.innerHTML = '<i class="bi bi-check-circle-fill"></i> IDLE';
-                        break;
-                    case 'CREATING':
-                    case 'UPDATING':
-                        statusBadge.classList.add('bg-warning', 'text-dark');
-                        statusBadge.innerHTML = '<i class="bi bi-gear-fill spinning-gear"></i> ' + cluster.stateName;
-                        break;
-                    default:
-                        statusBadge.classList.add('bg-secondary');
-                        statusBadge.innerHTML = '<i class="bi bi-question-circle-fill"></i> ' + (cluster.stateName || 'UNKNOWN');
-                }
-            }
-
-            if (cluster.stateName === 'IDLE') {
-                clearInterval(pollInterval);
-
-                document.getElementById('step-provisioning').innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Provisioning resources';
-                document.getElementById('step-configuring').innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Configuring MongoDB';
-                document.getElementById('step-ready').innerHTML = '<i class="bi bi-check-circle-fill text-success"></i> Finalizing deployment';
-
-                if (progressBar) {
-                    progressBar.style.width = '100%';
-                    progressBar.innerHTML = '<span class="fw-bold">Complete!</span>';
-                }
-
-                const successDiv = document.getElementById('createClusterSuccess');
-                successDiv.innerHTML = `
-                    <div class="text-center">
-                        <div class="mb-3">
-                            <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
-                        </div>
-                        <h4 class="text-success mb-3">
-                            Cluster Created Successfully!
-                        </h4>
-                        <p class="mb-3">
-                            <strong>${clusterName}</strong> is now ready to use
-                        </p>
-                        <div class="mb-3">
-                            <span class="badge bg-success fs-6 py-2 px-3">
-                                <i class="bi bi-check-circle-fill"></i> IDLE
-                            </span>
-                        </div>
-                        <div class="alert alert-success mb-0">
-                            <i class="bi bi-info-circle"></i>
-                            The cluster is fully operational and ready for connections.
-                            <br>
-                            <small class="text-muted">Refreshing cluster list...</small>
-                        </div>
-                    </div>
-                `;
-
-                setTimeout(() => {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('createClusterModal'));
-                    if (modal) modal.hide();
-                    loadClusters();
-                }, 3000);
-            }
-
-            if (attempts >= maxAttempts) {
-                clearInterval(pollInterval);
-                const successDiv = document.getElementById('createClusterSuccess');
-                successDiv.innerHTML = `
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                    Cluster creation is taking longer than expected.
-                    <div class="mt-2">
-                        <span class="badge bg-warning">${cluster.stateName || 'UNKNOWN'}</span>
-                        <small class="d-block mt-2">The cluster is still being created. You can close this dialog and check back later.</small>
-                    </div>
-                `;
-            }
-
-        } catch (err) {
-            console.error('Error polling cluster status:', err);
-            clearInterval(pollInterval);
+            // Show error in UI
+            errorDiv.textContent = errorMessage;
+            errorDiv.classList.remove('d-none');
+            // Reopen the modal to show the error
+            bootstrap.Modal.getInstance(document.getElementById('createClusterModal')).show();
+            return;
         }
 
-    }, 10000);
+        const result = await response.json();
+        console.log('Cluster creation queued:', result);
+
+        // Operation is now queued in backend, SSE stream will show progress
+        // Optionally show a brief notification
+        console.log(`Operation ${result.operation_id} queued: ${result.message}`);
+
+    } catch (err) {
+        console.error('Error creating cluster:', err);
+        errorDiv.textContent = err.message || 'Failed to create cluster';
+        errorDiv.classList.remove('d-none');
+        // Reopen the modal to show the error
+        bootstrap.Modal.getInstance(document.getElementById('createClusterModal')).show();
+    }
 }
 
 // Delete Cluster functionality
-let deleteClusterData = { name: '', projectId: '' };
+let deleteClusterData = { name: '', projectId: '', providerName: '', instanceSizeName: '' };
 
-function showDeleteClusterConfirmation(clusterName, projectId) {
-    deleteClusterData = { name: clusterName, projectId: projectId };
+function showDeleteClusterConfirmation(clusterName, projectId, providerName, instanceSizeName) {
+    deleteClusterData = {
+        name: clusterName,
+        projectId: projectId,
+        providerName: providerName || '',
+        instanceSizeName: instanceSizeName || ''
+    };
+
+    console.log('Showing delete confirmation for cluster:', deleteClusterData);
 
     document.getElementById('deleteClusterName').textContent = clusterName;
     document.getElementById('confirmClusterName').value = '';
@@ -1503,46 +1452,44 @@ async function deleteCluster() {
         return;
     }
 
-    // Capture cluster info for the queue
-    const clusterName = deleteClusterData.name;
-    const projectId = deleteClusterData.projectId;
+    // Hide error
+    errorDiv.classList.add('d-none');
 
     // Close the modal immediately
     bootstrap.Modal.getInstance(document.getElementById('deleteClusterModal')).hide();
 
-    // Queue the deletion operation
-    window.operationQueue.enqueue({
-        type: 'delete_cluster',
-        name: `Delete Cluster: ${clusterName}`,
-        metadata: {
-            clusterName: clusterName,
-            projectId: projectId
-        },
-        execute: async (updateProgress) => {
-            try {
-                updateProgress('Initiating cluster deletion...');
-                const response = await fetch(`/api/clusters/${projectId}/${clusterName}`, {
-                    method: 'DELETE'
-                });
+    try {
+        console.log('Deleting cluster:', deleteClusterData);
 
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.detail || `Failed to delete cluster (${response.status})`);
-                }
+        const response = await fetch(`/api/clusters/${deleteClusterData.projectId}/${deleteClusterData.name}`, {
+            method: 'DELETE'
+        });
 
-                updateProgress('Deletion initiated, cluster will be removed shortly');
+        if (!response.ok) {
+            const errorData = await response.json();
+            const errorMessage = errorData.detail || `Failed to delete cluster (${response.status})`;
 
-                // Reload clusters list
-                loadClusters();
-
-                return { success: true, clusterName: clusterName };
-
-            } catch (err) {
-                console.error('Error deleting cluster:', err);
-                throw err;
-            }
+            // Show error in UI
+            errorDiv.textContent = errorMessage;
+            errorDiv.classList.remove('d-none');
+            // Reopen the modal to show the error
+            bootstrap.Modal.getInstance(document.getElementById('deleteClusterModal')).show();
+            return;
         }
-    });
+
+        const result = await response.json();
+        console.log('Cluster deletion queued:', result);
+
+        // Operation is now queued in backend, SSE stream will show progress
+        console.log(`Operation ${result.operation_id} queued: ${result.message}`);
+
+    } catch (err) {
+        console.error('Error deleting cluster:', err);
+        errorDiv.textContent = err.message || 'Failed to delete cluster';
+        errorDiv.classList.remove('d-none');
+        // Reopen the modal to show the error
+        bootstrap.Modal.getInstance(document.getElementById('deleteClusterModal')).show();
+    }
 }
 
 // Add event listeners
@@ -1602,7 +1549,6 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('createClusterForm').reset();
         document.getElementById('createClusterForm').style.display = 'block';
         document.getElementById('createClusterError').classList.add('d-none');
-        document.getElementById('createClusterSuccess').classList.add('d-none');
         document.getElementById('regionName').disabled = true;
     });
 
@@ -1611,7 +1557,7 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('confirmClusterName').value = '';
         document.getElementById('deleteClusterError').classList.add('d-none');
         document.getElementById('confirmDeleteClusterBtn').disabled = true;
-        deleteClusterData = { name: '', projectId: '' };
+        deleteClusterData = { name: '', projectId: '', providerName: '', instanceSizeName: '' };
     });
 });
 </script>

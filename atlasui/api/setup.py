@@ -268,7 +268,7 @@ async def test_connection(auth_method: str) -> Dict[str, Any]:
         from atlasui.client import AtlasClient
 
         # Load configuration from environment
-        with AtlasClient() as client:
+        async with AtlasClient() as client:
             # Test basic connectivity
             result = client.get_root()
 

@@ -29,9 +29,21 @@ The panel automatically expands when new operations are added and can be manuall
 
 The following long-running operations are managed through the queue:
 
+* **Create Project**: Creating new MongoDB Atlas projects within an organization
 * **Create Cluster**: Creating new MongoDB clusters (M0, Flex, M10, M30, etc.)
 * **Delete Cluster**: Removing clusters from a project
-* **Delete Project**: Cascading deletion of projects with all associated clusters
+* **Delete Project**: Cascading deletion of projects with all associated clusters (includes automatic deletion of all associated clusters)
+
+### Auto-Refresh on Completion
+
+The UI automatically refreshes resource lists when operations complete:
+
+* **Project creation**: When a project is successfully created, it automatically appears in the projects list
+* **Cluster creation**: When a cluster is successfully created, it automatically appears in the clusters list
+* **Project deletion**: Deleted projects are immediately removed from the list (optimistic update)
+* **Cluster deletion**: Deleted clusters are immediately removed from the list (optimistic update)
+
+This eliminates the need for manual page refreshes while maintaining a responsive user experience.
 
 ## Flex Cluster Support
 

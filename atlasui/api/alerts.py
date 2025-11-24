@@ -22,8 +22,8 @@ async def list_alerts(project_id: str) -> Dict[str, Any]:
         Alerts list
     """
     try:
-        with AtlasClient() as client:
-            return client.get(f"/groups/{project_id}/alerts")
+        async with AtlasClient() as client:
+            return await client.get(f"/groups/{project_id}/alerts")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -41,8 +41,8 @@ async def get_alert(project_id: str, alert_id: str) -> Dict[str, Any]:
         Alert details
     """
     try:
-        with AtlasClient() as client:
-            return client.get(f"/groups/{project_id}/alerts/{alert_id}")
+        async with AtlasClient() as client:
+            return await client.get(f"/groups/{project_id}/alerts/{alert_id}")
     except Exception as e:
         if "404" in str(e):
             raise HTTPException(

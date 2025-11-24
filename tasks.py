@@ -220,6 +220,44 @@ def info(c):
 
 
 @task
+def atlascli(c, args=""):
+    """
+    Run atlascli with any arguments.
+
+    Args:
+        args: Arguments to pass to atlascli (e.g., "projects list", "clusters get <id>")
+
+    Examples:
+        inv atlascli --args="--version"
+        inv atlascli --args="projects list"
+        inv atlascli --args="clusters list <project-id>"
+    """
+    if args:
+        c.run(f"uv run atlascli {args}", pty=True)
+    else:
+        c.run("uv run atlascli --help", pty=True)
+
+
+@task
+def atlasui(c, args=""):
+    """
+    Run atlasui with any arguments.
+
+    Args:
+        args: Arguments to pass to atlasui (e.g., "start", "stop", "status", "--version")
+
+    Examples:
+        inv atlasui --args="--version"
+        inv atlasui --args="status"
+        inv atlasui --args="start --port 8080"
+    """
+    if args:
+        c.run(f"uv run atlasui {args}", pty=True)
+    else:
+        c.run("uv run atlasui --help", pty=True)
+
+
+@task
 def configure(c):
     """
     Interactively configure Atlas authentication.

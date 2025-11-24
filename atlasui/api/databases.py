@@ -28,7 +28,7 @@ async def list_databases(
         Database information response
     """
     try:
-        with AtlasClient() as client:
+        async with AtlasClient() as client:
             # Get database names (currently returns empty list)
             # This is a placeholder for future enhancement
             database_names = client.get_cluster_databases(project_id, cluster_name)
@@ -57,7 +57,7 @@ async def list_cluster_processes(
         Cluster processes response
     """
     try:
-        with AtlasClient() as client:
-            return client.list_databases(project_id, cluster_name)
+        async with AtlasClient() as client:
+            return await client.list_databases(project_id, cluster_name)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

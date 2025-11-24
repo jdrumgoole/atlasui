@@ -85,28 +85,29 @@ class AtlasClient:
             auth = DigestAuth(self.public_key, self.private_key)
 
         # Create HTTP client with the appropriate auth
-        self.client = httpx.Client(
+        # Using 2024-11-13 API version (required for Flex clusters as of Jan 2025)
+        self.client = httpx.AsyncClient(
             auth=auth,
             timeout=self.timeout,
             headers={
-                "Accept": "application/vnd.atlas.2023-01-01+json",
+                "Accept": "application/vnd.atlas.2024-11-13+json",
                 "Content-Type": "application/json",
             },
         )
 
-    def __enter__(self) -> "AtlasClient":
-        """Context manager entry."""
+    async def __aenter__(self) -> "AtlasClient":
+        """Async context manager entry."""
         return self
 
-    def __exit__(self, *args: Any) -> None:
-        """Context manager exit."""
-        self.close()
+    async def __aexit__(self, *args: Any) -> None:
+        """Async context manager exit."""
+        await self.close()
 
-    def close(self) -> None:
+    async def close(self) -> None:
         """Close the HTTP client."""
-        self.client.close()
+        await self.client.aclose()
 
-    def _request(
+    async def _request(
         self,
         method: str,
         endpoint: str,
@@ -130,7 +131,7 @@ class AtlasClient:
         """
         url = f"{self.base_url}{endpoint}"
 
-        response = self.client.request(
+        response = await self.client.request(
             method=method,
             url=url,
             params=params,
@@ -170,52 +171,52 @@ class AtlasClient:
 
         return response.json()
 
-    def get(
+    async def get(
         self, endpoint: str, params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Make a GET request."""
-        return self._request("GET", endpoint, params=params)
+        return await self._request("GET", endpoint, params=params)
 
-    def post(
+    async def post(
         self,
         endpoint: str,
         json: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Make a POST request."""
-        return self._request("POST", endpoint, params=params, json=json)
+        return await self._request("POST", endpoint, params=params, json=json)
 
-    def put(
+    async def put(
         self,
         endpoint: str,
         json: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Make a PUT request."""
-        return self._request("PUT", endpoint, params=params, json=json)
+        return await self._request("PUT", endpoint, params=params, json=json)
 
-    def patch(
+    async def patch(
         self,
         endpoint: str,
         json: Optional[Dict[str, Any]] = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Make a PATCH request."""
-        return self._request("PATCH", endpoint, params=params, json=json)
+        return await self._request("PATCH", endpoint, params=params, json=json)
 
-    def delete(
+    async def delete(
         self, endpoint: str, params: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Make a DELETE request."""
-        return self._request("DELETE", endpoint, params=params)
+        return await self._request("DELETE", endpoint, params=params)
 
     # Common Atlas API operations
 
-    def get_root(self) -> Dict[str, Any]:
+    async def get_root(self) -> Dict[str, Any]:
         """Get API root information."""
-        return self.get("/")
+        return await self.get("/")
 
-    def list_projects(
+    async def list_projects(
         self, page_num: int = 1, items_per_page: int = 100
     ) -> Dict[str, Any]:
         """
@@ -228,12 +229,12 @@ class AtlasClient:
         Returns:
             Projects list response
         """
-        return self.get(
+        return await self.get(
             "/groups",
             params={"pageNum": page_num, "itemsPerPage": items_per_page}
         )
 
-    def get_project(self, project_id: str) -> Dict[str, Any]:
+    async def get_project(self, project_id: str) -> Dict[str, Any]:
         """
         Get a specific project.
 
@@ -243,9 +244,9 @@ class AtlasClient:
         Returns:
             Project details
         """
-        return self.get(f"/groups/{project_id}")
+        return await self.get(f"/groups/{project_id}")
 
-    def create_project(
+    async def create_project(
         self, name: str, org_id: str
     ) -> Dict[str, Any]:
         """
@@ -259,9 +260,9 @@ class AtlasClient:
             Created project details
         """
         payload = {"name": name, "orgId": org_id}
-        return self.post("/groups", json=payload)
+        return await self.post("/groups", json=payload)
 
-    def delete_project(self, project_id: str) -> Dict[str, Any]:
+    async def delete_project(self, project_id: str) -> Dict[str, Any]:
         """
         Delete a project.
 
@@ -271,9 +272,9 @@ class AtlasClient:
         Returns:
             Deletion response
         """
-        return self.delete(f"/groups/{project_id}")
+        return await self.delete(f"/groups/{project_id}")
 
-    def list_clusters(
+    async def list_clusters(
         self, project_id: str, page_num: int = 1, items_per_page: int = 100
     ) -> Dict[str, Any]:
         """
@@ -287,12 +288,12 @@ class AtlasClient:
         Returns:
             Clusters list response
         """
-        return self.get(
+        return await self.get(
             f"/groups/{project_id}/clusters",
             params={"pageNum": page_num, "itemsPerPage": items_per_page}
         )
 
-    def get_cluster(self, project_id: str, cluster_name: str) -> Dict[str, Any]:
+    async def get_cluster(self, project_id: str, cluster_name: str) -> Dict[str, Any]:
         """
         Get a specific cluster.
 
@@ -303,13 +304,13 @@ class AtlasClient:
         Returns:
             Cluster details
         """
-        return self.get(f"/groups/{project_id}/clusters/{cluster_name}")
+        return await self.get(f"/groups/{project_id}/clusters/{cluster_name}")
 
-    def create_cluster(
+    async def create_cluster(
         self, project_id: str, cluster_config: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
-        Create a new cluster.
+        Create a new cluster (M0, M10+, etc. - not Flex).
 
         Args:
             project_id: Project ID
@@ -318,9 +319,61 @@ class AtlasClient:
         Returns:
             Created cluster details
         """
-        return self.post(f"/groups/{project_id}/clusters", json=cluster_config)
+        return await self.post(f"/groups/{project_id}/clusters", json=cluster_config)
 
-    def update_cluster(
+    async def create_flex_cluster(
+        self, project_id: str, cluster_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Create a new Flex cluster using the dedicated Flex endpoint.
+
+        As of January 2025, Flex clusters use a separate API endpoint
+        from regular clusters (M0, M10+).
+
+        Args:
+            project_id: Project ID
+            cluster_config: Flex cluster configuration
+
+        Returns:
+            Created Flex cluster details
+        """
+        return await self.post(f"/groups/{project_id}/flexClusters", json=cluster_config)
+
+    async def list_flex_clusters(
+        self, project_id: str, page_num: int = 1, items_per_page: int = 100
+    ) -> Dict[str, Any]:
+        """
+        List all Flex clusters in a project.
+
+        As of January 2025, Flex clusters are in a separate endpoint.
+
+        Args:
+            project_id: Project ID
+            page_num: Page number (1-indexed)
+            items_per_page: Number of items per page
+
+        Returns:
+            Flex clusters list response
+        """
+        return await self.get(
+            f"/groups/{project_id}/flexClusters",
+            params={"pageNum": page_num, "itemsPerPage": items_per_page}
+        )
+
+    async def get_flex_cluster(self, project_id: str, cluster_name: str) -> Dict[str, Any]:
+        """
+        Get a specific Flex cluster.
+
+        Args:
+            project_id: Project ID
+            cluster_name: Cluster name
+
+        Returns:
+            Flex cluster details
+        """
+        return await self.get(f"/groups/{project_id}/flexClusters/{cluster_name}")
+
+    async def update_cluster(
         self, project_id: str, cluster_name: str, cluster_config: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
@@ -334,13 +387,13 @@ class AtlasClient:
         Returns:
             Updated cluster details
         """
-        return self.patch(
+        return await self.patch(
             f"/groups/{project_id}/clusters/{cluster_name}", json=cluster_config
         )
 
-    def delete_cluster(self, project_id: str, cluster_name: str) -> Dict[str, Any]:
+    async def delete_cluster(self, project_id: str, cluster_name: str) -> Dict[str, Any]:
         """
-        Delete a cluster.
+        Delete a regular cluster (not Flex).
 
         Args:
             project_id: Project ID
@@ -349,9 +402,22 @@ class AtlasClient:
         Returns:
             Deletion response
         """
-        return self.delete(f"/groups/{project_id}/clusters/{cluster_name}")
+        return await self.delete(f"/groups/{project_id}/clusters/{cluster_name}")
 
-    def list_organizations(
+    async def delete_flex_cluster(self, project_id: str, cluster_name: str) -> Dict[str, Any]:
+        """
+        Delete a Flex cluster.
+
+        Args:
+            project_id: Project ID
+            cluster_name: Cluster name
+
+        Returns:
+            Deletion response
+        """
+        return await self.delete(f"/groups/{project_id}/flexClusters/{cluster_name}")
+
+    async def list_organizations(
         self, page_num: int = 1, items_per_page: int = 100
     ) -> Dict[str, Any]:
         """
@@ -364,12 +430,12 @@ class AtlasClient:
         Returns:
             Organizations list response
         """
-        return self.get(
+        return await self.get(
             "/orgs",
             params={"pageNum": page_num, "itemsPerPage": items_per_page}
         )
 
-    def get_organization(self, org_id: str) -> Dict[str, Any]:
+    async def get_organization(self, org_id: str) -> Dict[str, Any]:
         """
         Get a specific organization.
 
@@ -379,9 +445,9 @@ class AtlasClient:
         Returns:
             Organization details
         """
-        return self.get(f"/orgs/{org_id}")
+        return await self.get(f"/orgs/{org_id}")
 
-    def list_organization_projects(
+    async def list_organization_projects(
         self, org_id: str, page_num: int = 1, items_per_page: int = 100
     ) -> Dict[str, Any]:
         """
@@ -395,12 +461,12 @@ class AtlasClient:
         Returns:
             Projects list response for the organization
         """
-        return self.get(
+        return await self.get(
             f"/orgs/{org_id}/groups",
             params={"pageNum": page_num, "itemsPerPage": items_per_page}
         )
 
-    def list_databases(
+    async def list_databases(
         self, project_id: str, cluster_name: str
     ) -> Dict[str, Any]:
         """
@@ -418,12 +484,12 @@ class AtlasClient:
         # Get cluster connection info to list databases
         # The Atlas Admin API doesn't have a direct endpoint for databases,
         # so we'll use the process databases endpoint which shows database stats
-        return self.get(
+        return await self.get(
             f"/groups/{project_id}/processes",
             params={"clusterId": cluster_name}
         )
 
-    def get_cluster_databases(
+    async def get_cluster_databases(
         self, project_id: str, cluster_name: str
     ) -> List[str]:
         """
@@ -440,7 +506,7 @@ class AtlasClient:
         """
         try:
             # Get cluster details which may include database info
-            cluster = self.get_cluster(project_id, cluster_name)
+            cluster = await self.get_cluster(project_id, cluster_name)
 
             # For now, return empty list as database listing requires
             # additional API calls or direct MongoDB connection
