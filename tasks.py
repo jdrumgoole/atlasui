@@ -33,7 +33,7 @@ def test(c, verbose=True, coverage=True):
         coverage: Generate coverage report (default: True)
     """
     print("Running tests...")
-    cmd_parts = ["pytest"]
+    cmd_parts = ["uv", "run", "pytest"]
 
     if verbose:
         cmd_parts.append("-v")
