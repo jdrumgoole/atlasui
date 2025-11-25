@@ -143,13 +143,13 @@ def clean(c):
 
 
 @task
-def start(c, host="0.0.0.0", port=8000):
+def start(c, host="0.0.0.0", port=8100):
     """
     Start the web server.
 
     Args:
         host: Host to bind to (default: 0.0.0.0)
-        port: Port to bind to (default: 8000)
+        port: Port to bind to (default: 8100)
     """
     print(f"Starting AtlasUI server on {host}:{port}...")
     c.run(f"uv run atlasui start --host={host} --port={port}", pty=True)
@@ -163,12 +163,12 @@ def stop(c):
 
 
 @task
-def kill_port(c, port=8000):
+def kill_port(c, port=8100):
     """
     Kill any process running on a specific port.
 
     Args:
-        port: Port number to kill process on (default: 8000)
+        port: Port number to kill process on (default: 8100)
     """
     print(f"Killing process on port {port}...")
     result = c.run(f"lsof -ti:{port}", warn=True, hide=True)
@@ -183,13 +183,13 @@ def kill_port(c, port=8000):
 
 
 @task
-def restart(c, host="0.0.0.0", port=8000):
+def restart(c, host="0.0.0.0", port=8100):
     """
     Restart the web server.
 
     Args:
         host: Host to bind to (default: 0.0.0.0)
-        port: Port to bind to (default: 8000)
+        port: Port to bind to (default: 8100)
     """
     print(f"Restarting AtlasUI server on {host}:{port}...")
     c.run(f"uv run atlasui restart --host={host} --port={port}", pty=True)
