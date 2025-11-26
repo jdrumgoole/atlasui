@@ -2207,8 +2207,15 @@ async function createCluster() {
         clusterConfig.mongoDBMajorVersion = mongoDBVersion;
     }
 
-    // Close the modal immediately
-    bootstrap.Modal.getInstance(document.getElementById('createClusterModal')).hide();
+    // Close the modal immediately and clean up backdrop
+    const createModalEl = document.getElementById('createClusterModal');
+    const createModalInstance = bootstrap.Modal.getInstance(createModalEl) || bootstrap.Modal.getOrCreateInstance(createModalEl);
+    createModalInstance.hide();
+    // Clean up any stale backdrops
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
 
     try {
         console.log('Creating cluster with config:', JSON.stringify(clusterConfig, null, 2));
@@ -2303,8 +2310,15 @@ async function deleteCluster() {
     // Hide error
     errorDiv.classList.add('d-none');
 
-    // Close the modal immediately
-    bootstrap.Modal.getInstance(document.getElementById('deleteClusterModal')).hide();
+    // Close the modal immediately and clean up backdrop
+    const deleteModalEl = document.getElementById('deleteClusterModal');
+    const deleteModalInstance = bootstrap.Modal.getInstance(deleteModalEl) || bootstrap.Modal.getOrCreateInstance(deleteModalEl);
+    deleteModalInstance.hide();
+    // Clean up any stale backdrops
+    document.querySelectorAll('.modal-backdrop').forEach(el => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('overflow');
+    document.body.style.removeProperty('padding-right');
 
     try {
         console.log('Deleting cluster:', deleteClusterData);

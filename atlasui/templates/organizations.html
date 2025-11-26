@@ -247,6 +247,7 @@ async function loadHierarchy() {
         }
 
         renderTree();
+        expandAll();  // Expand tree by default
         loading.classList.add('d-none');
         tree.classList.remove('d-none');
 
