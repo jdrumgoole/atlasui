@@ -14,6 +14,20 @@ service_accounts
 security
 ```
 
+## Screenshots
+
+### Dashboard
+![Dashboard](images/dashboard.png)
+
+### Organizations
+![Organizations](images/organizations.png)
+
+### All Clusters
+![All Clusters](images/clusters.png)
+
+### All Projects
+![All Projects](images/projects.png)
+
 ## Features
 
 * **Web UI**: FastAPI-based web interface for MongoDB Atlas management

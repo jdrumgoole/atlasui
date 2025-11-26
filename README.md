@@ -10,6 +10,20 @@ A comprehensive user interface for MongoDB Atlas, providing both a web-based UI 
 - **Modern Stack**: FastAPI, Typer, Rich, and modern Python tooling
 - **Secure Authentication**: Supports both API keys (recommended for full functionality) and service accounts (project-scoped only)
 
+## Screenshots
+
+### Dashboard
+![Dashboard](docs/images/dashboard.png)
+
+### Organizations
+![Organizations](docs/images/organizations.png)
+
+### All Clusters
+![Clusters](docs/images/clusters.png)
+
+### All Projects
+![Projects](docs/images/projects.png)
+
 ## Atlas API Coverage
 
 This UI provides access to all MongoDB Atlas administration APIs including:
