@@ -40,6 +40,7 @@ Usage:
 """
 
 import pytest
+import pytest_asyncio
 import sys
 import subprocess
 import time
@@ -49,6 +50,20 @@ from typing import Optional, Dict, Any
 from unittest.mock import Mock, patch
 from atlasui.client import AtlasClient
 from atlasui.config import settings
+# ============================================================================
+# Test Execution Notes
+# ============================================================================
+# Browser tests (marked with @pytest.mark.browser) and async tests should be
+# run in separate pytest sessions to avoid event loop conflicts.
+#
+# Run async tests (unit and integration):
+#   uv run pytest tests/ -m "not browser" -v
+#
+# Run browser tests:
+#   uv run pytest tests/ -m browser -v
+#
+# Run all tests (may have event loop conflicts):
+#   uv run pytest tests/ -v
 
 
 # ============================================================================
@@ -432,7 +447,7 @@ def validate_credentials():
         return False
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def atlas_client(validate_credentials):
     """
     Create a real Atlas API client for integration tests.

@@ -1,6 +1,6 @@
 [project]
 name = "atlasui"
-version = "0.2.2"
+version = "0.2.3"
 description = "User Interface for MongoDB Atlas - Web UI and CLI tool"
 readme = "README.md"
 authors = [
@@ -65,13 +65,14 @@ testpaths = ["tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-asyncio_mode = "auto"
+asyncio_mode = "strict"
 markers = [
     "integration: marks tests as integration tests (require valid API credentials)",
     "lifecycle: marks cluster lifecycle tests (can run in parallel)",
     "m0: marks M0 cluster tests",
     "flex: marks Flex cluster tests",
     "m10: marks M10 cluster tests",
+    "browser: marks tests that use Playwright browser automation (run separately from async tests)",
 ]
 addopts = "-v --strict-markers"
 

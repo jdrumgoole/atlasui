@@ -74,6 +74,40 @@ let projects = [];
 document.addEventListener('DOMContentLoaded', function() {
     loadProjects();
     document.getElementById('refreshBtn').addEventListener('click', loadProjects);
+
+    // Listen for operation completions to auto-refresh project list
+    let pollAttempts = 0;
+    const maxPollAttempts = 10;
+    const pollInterval = setInterval(() => {
+        pollAttempts++;
+        console.log(`[All Projects] Polling for operationQueueUI (attempt ${pollAttempts}/${maxPollAttempts})`);
+
+        if (window.operationQueueUI && window.operationQueueUI.manager) {
+            clearInterval(pollInterval);
+            console.log('[All Projects] operationQueueUI found, registering listener');
+
+            window.operationQueueUI.manager.addListener((event, operation) => {
+                console.log('[All Projects] SSE event received:', event, 'type:', operation.type);
+
+                // Reload projects list when:
+                // - create_project completes (new project added)
+                // - create_cluster completes (cluster count increases)
+                // - delete_cluster completes (cluster count decreases)
+                if (event === 'completed' &&
+                    (operation.type === 'create_project' ||
+                     operation.type === 'create_cluster' ||
+                     operation.type === 'delete_cluster')) {
+                    console.log(`[All Projects] ${operation.type} completed, reloading projects list to update cluster counts`);
+                    loadProjects();
+                }
+            });
+
+            console.log('[All Projects] Event listener registered successfully');
+        } else if (pollAttempts >= maxPollAttempts) {
+            clearInterval(pollInterval);
+            console.error('[All Projects] Failed to find operationQueueUI after', maxPollAttempts, 'attempts');
+        }
+    }, 500);
 });
 
 async function loadProjects() {
@@ -167,7 +201,7 @@ function renderProjects() {
                     <span class="badge bg-primary">${project.clusterCount || 0}</span>
                 </a>
             </td>
-            <td>${new Date(project.created).toLocaleDateString()}</td>
+            <td>${new Date(project.created).toLocaleString()}</td>
             <td>
                 <button class="btn btn-sm btn-outline-info" onclick="showProjectDetails('${project.id}')">
                     <i class="bi bi-info-circle"></i> Details

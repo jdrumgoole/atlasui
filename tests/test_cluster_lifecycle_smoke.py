@@ -13,6 +13,7 @@ from playwright.sync_api import Page
 import time
 
 
+@pytest.mark.browser
 @pytest.mark.integration
 def test_cluster_lifecycle_smoke(page: Page, atlasui_server):
     """
@@ -30,13 +31,13 @@ def test_cluster_lifecycle_smoke(page: Page, atlasui_server):
     # Test 1: Navigate to application
     print("\n1. Testing navigation to application...")
     page.goto(base_url)
-    page.wait_for_load_state("networkidle")
+    page.wait_for_load_state("load")
     print("   ✓ Successfully navigated to application")
 
     # Test 2: Navigate to clusters page
     print("\n2. Testing navigation to clusters page...")
     page.goto(f"{base_url}/clusters")
-    page.wait_for_load_state("networkidle")
+    page.wait_for_load_state("load")
     time.sleep(2)
     print("   ✓ Successfully navigated to clusters page")
 
@@ -91,7 +92,7 @@ def test_cluster_lifecycle_smoke(page: Page, atlasui_server):
     # Test 7: Navigate to organizations page
     print("\n7. Testing navigation to organizations page...")
     page.goto(f"{base_url}/organizations")
-    page.wait_for_load_state("networkidle")
+    page.wait_for_load_state("load")
     time.sleep(2)
     print("   ✓ Successfully navigated to organizations page")
 

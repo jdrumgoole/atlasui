@@ -8,6 +8,7 @@ from playwright.sync_api import Page, expect
 import json
 
 
+@pytest.mark.browser
 def test_create_cluster(page: Page, atlasui_server):
     """
     Test cluster creation through the UI.
@@ -55,12 +56,12 @@ def test_create_cluster(page: Page, atlasui_server):
     page.goto(base_url)
 
     # Wait for the page to load
-    page.wait_for_load_state("networkidle")
+    page.wait_for_load_state("load")
 
     # Navigate to the global clusters page
     print("2. Navigating to global clusters page")
     page.goto(f"{base_url}/clusters")
-    page.wait_for_load_state("networkidle")
+    page.wait_for_load_state("load")
 
     # Wait for the Create Cluster button to be visible
     print("3. Waiting for Create Cluster button")

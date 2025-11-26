@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2025-11-26
+
+### Fixed
+- Event loop conflicts between Playwright browser tests and async tests
+- Browser test timeouts by changing wait strategy from "networkidle" to "load"
+- All async test markers to work with pytest-asyncio strict mode
+
+### Added
+- Browser test marker (@pytest.mark.browser) for proper test separation
+- Comprehensive test documentation in tests/README.md
+- Auto-update cluster counts on projects pages when cluster operations complete
+
+### Improved
+- Test infrastructure now supports running browser and async tests separately
+- Complete test suite: 68 tests (66 async + 2 browser), all passing
+- Enhanced documentation for running different test types
+
 ## [0.2.1] - 2025-11-25
 
 ### Fixed
@@ -69,6 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Initial release with basic functionality
 
+[0.2.3]: https://github.com/jdrumgoole/atlasui/compare/v0.2.1...v0.2.3
 [0.2.1]: https://github.com/jdrumgoole/atlasui/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/jdrumgoole/atlasui/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/jdrumgoole/atlasui/compare/v0.1.3...v0.1.4

@@ -27,3 +27,4 @@ When making a release, follow this exact order:
 - when building tests and the UI, always poll for state changes rather than using timeouts. Where an appropriate state change is not available look to create that in the backend.
 - pyproject.toml's version is synchronised from the config.py
 - use shot-scraper to take screen shots
+- always syncrhonize the sphinx documentation version with the pyproject.toml version

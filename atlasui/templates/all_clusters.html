@@ -719,7 +719,11 @@ function renderClusterRow(cluster) {
         <td>${cluster.providerSettings?.providerName || 'N/A'}</td>
         <td>${cluster.providerSettings?.regionName || 'N/A'}</td>
         <td>${cluster.providerSettings?.instanceSizeName || 'N/A'}</td>
-        <td><span class="badge bg-secondary">${users.length}</span></td>
+        <td>
+            <a href="javascript:void(0)" class="text-decoration-none" onclick="showClusterDetails('${cluster.id || cluster.name}')">
+                <span class="badge bg-secondary">${users.length}</span>
+            </a>
+        </td>
         <td>
             ${pauseResumeBtn}
             <button class="btn btn-sm btn-outline-primary cluster-login-btn me-1"
@@ -1457,7 +1461,11 @@ function renderClusters() {
             <td>${cluster.providerSettings?.providerName || 'N/A'}</td>
             <td>${cluster.providerSettings?.regionName || 'N/A'}</td>
             <td>${cluster.providerSettings?.instanceSizeName || 'N/A'}</td>
-            <td><span class="badge bg-secondary">${users.length}</span></td>
+            <td>
+                <a href="javascript:void(0)" class="text-decoration-none" onclick="showClusterDetails('${cluster.id || cluster.name}')">
+                    <span class="badge bg-secondary">${users.length}</span>
+                </a>
+            </td>
             <td>
                 ${pauseResumeBtn}
                 <button class="btn btn-sm btn-outline-primary cluster-login-btn me-1"

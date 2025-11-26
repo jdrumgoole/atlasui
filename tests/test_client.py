@@ -20,6 +20,7 @@ def test_atlas_client_initialization():
         assert client.base_url == "https://test.mongodb.com/api/atlas/v2"
 
 
+@pytest.mark.asyncio
 async def test_atlas_client_context_manager():
     """Test Atlas client works as async context manager."""
     with patch('atlasui.client.base.httpx.AsyncClient') as mock_client:
@@ -31,6 +32,7 @@ async def test_atlas_client_context_manager():
             assert client is not None
 
 
+@pytest.mark.asyncio
 async def test_get_root(mock_atlas_client):
     """Test getting API root."""
     mock_response = Mock()
@@ -45,6 +47,7 @@ async def test_get_root(mock_atlas_client):
         assert result["appName"] == "MongoDB Atlas"
 
 
+@pytest.mark.asyncio
 async def test_list_projects(mock_atlas_client, sample_projects_response):
     """Test listing projects."""
     mock_response = Mock()
@@ -61,6 +64,7 @@ async def test_list_projects(mock_atlas_client, sample_projects_response):
         assert result["results"][0]["name"] == "Test Project"
 
 
+@pytest.mark.asyncio
 async def test_get_project(mock_atlas_client, sample_project):
     """Test getting a specific project."""
     mock_response = Mock()
@@ -76,6 +80,7 @@ async def test_get_project(mock_atlas_client, sample_project):
         assert result["id"] == "5a0a1e7e0f2912c554080adc"
 
 
+@pytest.mark.asyncio
 async def test_list_clusters(mock_atlas_client, sample_clusters_response):
     """Test listing clusters."""
     mock_response = Mock()
@@ -92,6 +97,7 @@ async def test_list_clusters(mock_atlas_client, sample_clusters_response):
         assert result["results"][0]["name"] == "test-cluster"
 
 
+@pytest.mark.asyncio
 async def test_get_cluster(mock_atlas_client, sample_cluster):
     """Test getting a specific cluster."""
     mock_response = Mock()

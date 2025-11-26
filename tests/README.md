@@ -16,6 +16,13 @@ Integration tests make real API calls to MongoDB Atlas and require valid credent
 - `test_integration.py` - Tests for Atlas API client operations
 - `test_api_integration.py` - Tests for web API endpoints with real Atlas data
 
+### Browser Tests
+Browser tests use Playwright to test the web UI and require a running server:
+- `test_cluster_lifecycle_smoke.py` - Smoke tests for cluster lifecycle UI
+- `test_create_cluster_ui.py` - Tests for cluster creation UI
+
+**Important:** Browser tests should be run separately from async tests to avoid event loop conflicts. See "Running Tests" section below.
+
 ## Running Tests
 
 ### Prerequisites
@@ -36,10 +43,22 @@ ATLAS_PUBLIC_KEY=your_public_key
 ATLAS_PRIVATE_KEY=your_private_key
 ```
 
-### Run All Tests
+### Run All Tests (Recommended Approach)
+
+Due to event loop conflicts between browser tests and async tests, it's recommended to run them separately:
 
 ```bash
-# Run all tests (unit + integration)
+# Run async tests (unit + integration, excluding browser)
+uv run pytest tests/ -m "not browser" -v
+
+# Run browser tests separately
+uv run pytest tests/ -m browser -v
+```
+
+Alternatively, you can run all tests together (may experience event loop conflicts):
+
+```bash
+# Run all tests (may have event loop conflicts)
 pytest
 
 # Or using invoke
@@ -49,15 +68,18 @@ inv test
 ### Run Only Unit Tests
 
 ```bash
-# Skip integration tests
+# Skip integration and browser tests
+pytest -m "not integration and not browser"
+
+# Or simpler: skip integration tests only
 pytest -m "not integration"
 ```
 
 ### Run Only Integration Tests
 
 ```bash
-# Run only integration tests
-pytest -m integration
+# Run only integration tests (excluding browser)
+pytest -m "integration and not browser"
 
 # Run specific integration test file
 pytest tests/test_integration.py -v
@@ -67,6 +89,16 @@ pytest tests/test_integration.py::TestProjects -v
 
 # Run specific test
 pytest tests/test_integration.py::TestProjects::test_list_projects -v
+```
+
+### Run Only Browser Tests
+
+```bash
+# Run browser tests (requires running server)
+pytest -m browser
+
+# Or with full path
+uv run pytest tests/ -m browser -v
 ```
 
 ### Run with Coverage

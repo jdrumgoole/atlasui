@@ -8,6 +8,7 @@ Run with: pytest tests/test_integration.py -v -m integration
 """
 
 import pytest
+import pytest_asyncio
 from typing import Dict, Any
 
 
@@ -15,6 +16,7 @@ from typing import Dict, Any
 class TestAtlasAPIRoot:
     """Test Atlas API root endpoint."""
 
+    @pytest.mark.asyncio
     async def test_get_root(self, atlas_client):
         """Test getting API root information."""
         result = await atlas_client.get_root()
@@ -23,6 +25,7 @@ class TestAtlasAPIRoot:
         assert isinstance(result, dict)
         assert "appName" in result or "links" in result
 
+    @pytest.mark.asyncio
     async def test_api_connectivity(self, atlas_client):
         """Test basic API connectivity and authentication."""
         # Making any successful API call validates connectivity and auth
@@ -34,6 +37,7 @@ class TestAtlasAPIRoot:
 class TestOrganizations:
     """Test organization-related API operations."""
 
+    @pytest.mark.asyncio
     async def test_list_organizations(self, atlas_client):
         """Test listing organizations."""
         result = await atlas_client.list_organizations()
@@ -49,6 +53,7 @@ class TestOrganizations:
             assert "id" in org
             assert "name" in org
 
+    @pytest.mark.asyncio
     async def test_get_organization(self, atlas_client):
         """Test getting a specific organization."""
         # First, get list of organizations
@@ -67,6 +72,7 @@ class TestOrganizations:
         assert result["id"] == org_id
         assert "name" in result
 
+    @pytest.mark.asyncio
     async def test_list_organization_projects(self, atlas_client):
         """Test listing projects in an organization."""
         # First, get list of organizations
@@ -90,6 +96,7 @@ class TestOrganizations:
 class TestProjects:
     """Test project-related API operations."""
 
+    @pytest.mark.asyncio
     async def test_list_projects(self, atlas_client):
         """Test listing all projects."""
         result = await atlas_client.list_projects()
@@ -106,6 +113,7 @@ class TestProjects:
             assert "name" in project
             assert "orgId" in project
 
+    @pytest.mark.asyncio
     async def test_get_project(self, atlas_client):
         """Test getting a specific project."""
         # First, get list of projects
@@ -125,6 +133,7 @@ class TestProjects:
         assert "name" in result
         assert "orgId" in result
 
+    @pytest.mark.asyncio
     async def test_projects_pagination(self, atlas_client):
         """Test project list pagination."""
         # Get first page with 1 item
@@ -142,7 +151,7 @@ class TestProjects:
 class TestClusters:
     """Test cluster-related API operations."""
 
-    @pytest.fixture
+    @pytest_asyncio.fixture
     async def project_with_clusters(self, atlas_client):
         """Find a project that has clusters."""
         projects_result = await atlas_client.list_projects()
@@ -162,6 +171,7 @@ class TestClusters:
 
         pytest.skip("No projects with clusters available for testing")
 
+    @pytest.mark.asyncio
     async def test_list_clusters(self, atlas_client):
         """Test listing clusters in a project."""
         # Get a project first
@@ -179,6 +189,7 @@ class TestClusters:
         assert "results" in result
         assert isinstance(result["results"], list)
 
+    @pytest.mark.asyncio
     async def test_get_cluster(self, atlas_client, project_with_clusters):
         """Test getting a specific cluster."""
         project = project_with_clusters["project"]
@@ -192,6 +203,7 @@ class TestClusters:
         assert "stateName" in result
         assert "clusterType" in result
 
+    @pytest.mark.asyncio
     async def test_cluster_details(self, atlas_client, project_with_clusters):
         """Test getting detailed cluster information."""
         project = project_with_clusters["project"]
@@ -217,6 +229,7 @@ class TestClusters:
             assert isinstance(result["replicationSpecs"], list)
             assert len(result["replicationSpecs"]) > 0
 
+    @pytest.mark.asyncio
     async def test_clusters_pagination(self, atlas_client):
         """Test cluster list pagination."""
         # Get a project first
@@ -242,6 +255,7 @@ class TestClusters:
 class TestErrorHandling:
     """Test error handling and edge cases."""
 
+    @pytest.mark.asyncio
     async def test_get_nonexistent_project(self, atlas_client):
         """Test getting a project that doesn't exist."""
         # Use a fake project ID
@@ -250,6 +264,7 @@ class TestErrorHandling:
         with pytest.raises(Exception):  # Should raise HTTPError
             await atlas_client.get_project(fake_project_id)
 
+    @pytest.mark.asyncio
     async def test_get_nonexistent_cluster(self, atlas_client):
         """Test getting a cluster that doesn't exist."""
         # Get a real project first
@@ -264,6 +279,7 @@ class TestErrorHandling:
         with pytest.raises(Exception):  # Should raise HTTPError
             await atlas_client.get_cluster(project_id, fake_cluster_name)
 
+    @pytest.mark.asyncio
     async def test_invalid_pagination(self, atlas_client):
         """Test pagination with invalid parameters."""
         # Page 0 should still work or raise a clear error
@@ -280,6 +296,7 @@ class TestErrorHandling:
 class TestClientLifecycle:
     """Test client lifecycle and resource management."""
 
+    @pytest.mark.asyncio
     async def test_client_context_manager(self, validate_credentials):
         """Test client works correctly as async context manager."""
         if not validate_credentials:
@@ -291,6 +308,7 @@ class TestClientLifecycle:
             result = await client.get_root()
             assert result is not None
 
+    @pytest.mark.asyncio
     async def test_client_close(self, validate_credentials):
         """Test explicit client close."""
         if not validate_credentials:

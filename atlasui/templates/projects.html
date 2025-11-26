@@ -212,9 +212,15 @@ document.addEventListener('DOMContentLoaded', function() {
             window.operationQueueUI.manager.addListener((event, operation) => {
                 console.log('[Projects] SSE event received:', event, 'type:', operation.type);
 
-                // Only reload for create_project (delete already removes the item optimistically)
-                if (event === 'completed' && operation.type === 'create_project') {
-                    console.log(`[Projects] ${operation.type} completed, reloading projects list`);
+                // Reload projects list when:
+                // - create_project completes (new project added)
+                // - create_cluster completes (cluster count increases)
+                // - delete_cluster completes (cluster count decreases)
+                if (event === 'completed' &&
+                    (operation.type === 'create_project' ||
+                     operation.type === 'create_cluster' ||
+                     operation.type === 'delete_cluster')) {
+                    console.log(`[Projects] ${operation.type} completed, reloading projects list to update cluster counts`);
                     loadProjects();
                 }
             });
@@ -315,7 +321,7 @@ function renderProjects() {
                     <span class="badge bg-primary">${project.clusterCount || 0}</span>
                 </a>
             </td>
-            <td>${new Date(project.created).toLocaleDateString()}</td>
+            <td>${new Date(project.created).toLocaleString()}</td>
             <td>
                 <button class="btn btn-sm btn-outline-danger" onclick="confirmDeleteProject('${project.id}', '${project.name.replace(/'/g, "\\'")}')">
                     <i class="bi bi-trash"></i> Delete
