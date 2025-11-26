@@ -13,16 +13,16 @@ A comprehensive user interface for MongoDB Atlas, providing both a web-based UI 
 ## Screenshots
 
 ### Dashboard
-![Dashboard](docs/images/dashboard.png)
+![Dashboard](https://raw.githubusercontent.com/jdrumgoole/atlasui/main/docs/images/dashboard.png)
 
 ### Organizations
-![Organizations](docs/images/organizations.png)
+![Organizations](https://raw.githubusercontent.com/jdrumgoole/atlasui/main/docs/images/organizations.png)
 
 ### All Clusters
-![Clusters](docs/images/clusters.png)
+![Clusters](https://raw.githubusercontent.com/jdrumgoole/atlasui/main/docs/images/clusters.png)
 
 ### All Projects
-![Projects](docs/images/projects.png)
+![Projects](https://raw.githubusercontent.com/jdrumgoole/atlasui/main/docs/images/projects.png)
 
 ## Atlas API Coverage
 
@@ -131,7 +131,7 @@ atlasui-configure
 
 **Note:** Both API Keys and Service Accounts are scoped to a single organization. To work with a different organization, you'll need to configure credentials for that organization.
 
-See [Service Account Documentation](docs/service_accounts.md) for details.
+See [Service Account Documentation](https://github.com/jdrumgoole/atlasui/blob/main/docs/service_accounts.md) for details.
 
 ### Web-Based Configuration
 
@@ -326,12 +326,12 @@ See LICENSE file for details.
 
 ## Contributing
 
-Contributions are welcome! Please see CONTRIBUTING.md for details.
+Contributions are welcome! Please see [CONTRIBUTING.md](https://github.com/jdrumgoole/atlasui/blob/main/CONTRIBUTING.md) for details.
 
 ## Quick Links
 
-- [Quick Start Guide](QUICKSTART.md) - Get started in 5 minutes
-- [Contributing Guide](CONTRIBUTING.md) - Development guidelines
+- [Quick Start Guide](https://github.com/jdrumgoole/atlasui/blob/main/QUICKSTART.md) - Get started in 5 minutes
+- [Contributing Guide](https://github.com/jdrumgoole/atlasui/blob/main/CONTRIBUTING.md) - Development guidelines
 - [MongoDB Atlas API Docs](https://www.mongodb.com/docs/atlas/reference/api-resources-spec/)
 - [MongoDB Atlas OpenAPI Specs](https://github.com/mongodb/openapi)
 
