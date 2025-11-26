@@ -24,6 +24,79 @@ AtlasUI supports two authentication methods:
 
 See [service_accounts.md](service_accounts.md) for detailed information.
 
+## Built-In Security Features
+
+AtlasUI includes several built-in security features to protect against common attacks:
+
+### Rate Limiting
+
+Rate limiting is enforced on sensitive endpoints to prevent brute force attacks:
+
+* **Login Endpoint** (`/api/clusters/login`): Limited to 10 requests per minute
+* **Configuration Endpoints** (`/api/setup/configure/*`): Limited to 5 requests per minute
+
+Rate limits are tracked per IP address and return HTTP 429 (Too Many Requests) when exceeded.
+
+### Input Validation
+
+All user input is validated to prevent injection attacks and malformed data:
+
+#### API Key Validation
+
+* **Public Key Format**: Must be exactly 8 alphanumeric characters
+* **Private Key Format**: Must match UUID format (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+* Format validation occurs before attempting to use credentials
+
+#### Path Traversal Protection
+
+Credentials file upload feature includes strict path validation:
+
+* Only allows files in user's home directory or current working directory
+* Blocks access to sensitive system paths (`/etc`, `.ssh`, `.aws`, etc.)
+* Prevents directory traversal attacks (`../`, symlinks)
+* Limits file size to 1MB maximum
+* Validates file is a regular file, not a directory or device
+
+Example blocked paths:
+```text
+/etc/passwd          # System files
+/var/log/            # System logs
+~/.ssh/id_rsa        # SSH keys
+~/.aws/credentials   # Cloud credentials
+/root/               # Root directory
+```
+
+### Secure Cookie Flags
+
+Session cookies are set with secure flags:
+
+* **httponly**: Prevents JavaScript access to cookies (XSS protection)
+* **secure**: Only transmit over HTTPS (development localhost exempt)
+* **samesite=strict**: Prevents CSRF attacks by blocking cross-site cookie transmission
+
+Example cookie configuration:
+```python
+response.set_cookie(
+    key="mongodb_session_id",
+    value=session_id,
+    httponly=True,
+    secure=True,
+    samesite="strict",
+    max_age=3600
+)
+```
+
+**Note**: The `secure` flag requires HTTPS in production. Modern browsers automatically exempt `localhost` for development convenience.
+
+### MongoDB Session Management
+
+MongoDB client sessions are managed with security in mind:
+
+* **Credential Encoding**: Username and password are properly URL-encoded to handle special characters
+* **Connection String Sanitization**: Credentials are stripped from logs and error messages
+* **Session Timeout**: Sessions expire after 60 minutes of inactivity
+* **Clean Shutdown**: All sessions are closed when server shuts down
+
 ## Credential Management
 
 ### Never Commit Credentials

@@ -240,6 +240,45 @@ AtlasUI features a custom MongoDB-themed favicon with:
 * SVG format for crisp display at any size
 * Support for both light and dark browser themes
 
+## Project-Based Filtering
+
+AtlasUI provides powerful filtering capabilities to help you focus on specific projects when viewing all clusters.
+
+### Excel-Style Column Filter
+
+The All Clusters page includes an Excel-style filter for the Project column:
+
+* **Filter Icon**: Click the funnel icon next to "Project" in the table header
+* **Dropdown Menu**: Opens a searchable list of all projects with checkboxes
+* **Select/Clear All**: Quickly select or deselect all projects
+* **Search Box**: Filter the project list by typing
+* **Visual Indicator**: The funnel icon turns blue when a filter is active
+* **Multiple Selection**: Choose multiple projects to view their clusters simultaneously
+
+### URL-Based Filtering
+
+When clicking a cluster count badge on the Projects page:
+
+* **Automatic Navigation**: Takes you to the All Clusters page
+* **Pre-Applied Filter**: Automatically filters to show only that project's clusters
+* **URL Parameter**: Uses `?project=ProjectName` in the URL for bookmarkable filters
+* **Filter State**: The project filter dropdown reflects the active selection
+* **Quick Context Switching**: Easily see all clusters for a specific project
+
+### Using the Filter
+
+1. Navigate to the All Clusters page
+2. Click the funnel icon next to "Project"
+3. Use the search box to find specific projects (optional)
+4. Check/uncheck projects to filter the cluster list
+5. Click outside the dropdown to close it
+6. Click "Select All" to see all clusters again
+
+Alternatively, from the Projects page:
+1. Find a project with clusters
+2. Click the blue cluster count badge
+3. View filtered clusters for that project only
+
 ## Responsive UI
 
 The interface is built with Bootstrap 5 and provides:
