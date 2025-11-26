@@ -99,6 +99,7 @@ def poll_cluster_state(project_id: str, cluster_name: str, expected_paused: bool
 # Pause/Resume Tests (M10+ clusters only)
 # =============================================================================
 
+@pytest.mark.browser
 @pytest.mark.integration
 @pytest.mark.pause_resume
 @pytest.mark.m10
@@ -238,6 +239,7 @@ def test_pause_resume_m10(page: Page, atlasui_server, m10_cluster):
 # Cluster Restriction Tests (M0, Flex cannot be paused)
 # =============================================================================
 
+@pytest.mark.browser
 @pytest.mark.integration
 @pytest.mark.restrictions
 @pytest.mark.m0
@@ -279,6 +281,7 @@ def test_m0_no_pause_button(page: Page, atlasui_server, m0_cluster):
     log("=" * 80)
 
 
+@pytest.mark.browser
 @pytest.mark.integration
 @pytest.mark.restrictions
 @pytest.mark.flex
@@ -324,6 +327,7 @@ def test_flex_no_pause_button(page: Page, atlasui_server, flex_cluster):
 # Cluster Display Tests
 # =============================================================================
 
+@pytest.mark.browser
 @pytest.mark.integration
 @pytest.mark.display
 def test_all_clusters_visible(page: Page, atlasui_server, test_clusters):
@@ -379,6 +383,7 @@ def test_all_clusters_visible(page: Page, atlasui_server, test_clusters):
     log("=" * 80)
 
 
+@pytest.mark.browser
 @pytest.mark.integration
 @pytest.mark.display
 def test_cluster_status_badges(page: Page, atlasui_server, test_clusters):
