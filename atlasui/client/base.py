@@ -391,6 +391,44 @@ class AtlasClient:
             f"/groups/{project_id}/clusters/{cluster_name}", json=cluster_config
         )
 
+    async def pause_cluster(self, project_id: str, cluster_name: str) -> Dict[str, Any]:
+        """
+        Pause a cluster.
+
+        Pausing a cluster stops compute but preserves data.
+        Only dedicated clusters (M10+) can be paused.
+        M0 (Free Tier) and Flex clusters cannot be paused.
+
+        Args:
+            project_id: Project ID
+            cluster_name: Cluster name
+
+        Returns:
+            Updated cluster details with paused=True
+        """
+        return await self.patch(
+            f"/groups/{project_id}/clusters/{cluster_name}",
+            json={"paused": True}
+        )
+
+    async def resume_cluster(self, project_id: str, cluster_name: str) -> Dict[str, Any]:
+        """
+        Resume a paused cluster.
+
+        After resuming, you cannot pause the cluster again for 60 minutes.
+
+        Args:
+            project_id: Project ID
+            cluster_name: Cluster name
+
+        Returns:
+            Updated cluster details with paused=False
+        """
+        return await self.patch(
+            f"/groups/{project_id}/clusters/{cluster_name}",
+            json={"paused": False}
+        )
+
     async def delete_cluster(self, project_id: str, cluster_name: str) -> Dict[str, Any]:
         """
         Delete a regular cluster (not Flex).

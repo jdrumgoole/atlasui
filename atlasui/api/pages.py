@@ -57,22 +57,23 @@ async def setup_wizard(request: Request, register: bool = False):
     if is_configured() and not register:
         return RedirectResponse(url="/organizations", status_code=302)
 
-    return templates.TemplateResponse("setup.html", {"request": request})
+    return templates.TemplateResponse(request, "setup.html")
 
 
 @router.get("/organizations", response_class=HTMLResponse)
 async def organizations(request: Request):
     """Render the organizations list page."""
-    return templates.TemplateResponse("organizations.html", {"request": request})
+    return templates.TemplateResponse(request, "organizations.html")
 
 
 @router.get("/organizations/{org_id_or_name}/projects", response_class=HTMLResponse)
 async def organization_projects(request: Request, org_id_or_name: str):
     """Render the projects page for a specific organization."""
-    return templates.TemplateResponse("projects.html", {
-        "request": request,
-        "org_id_or_name": org_id_or_name
-    })
+    return templates.TemplateResponse(
+        request,
+        "projects.html",
+        {"org_id_or_name": org_id_or_name}
+    )
 
 
 @router.get("/projects")
@@ -95,13 +96,14 @@ async def projects_redirect(request: Request):
 @router.get("/clusters", response_class=HTMLResponse)
 async def all_clusters(request: Request):
     """Render the all clusters page showing clusters from all projects."""
-    return templates.TemplateResponse("all_clusters.html", {"request": request})
+    return templates.TemplateResponse(request, "all_clusters.html")
 
 
 @router.get("/clusters/{cluster_name}/databases", response_class=HTMLResponse)
 async def cluster_databases(request: Request, cluster_name: str):
     """Render the databases page for a specific cluster."""
-    return templates.TemplateResponse("databases.html", {
-        "request": request,
-        "cluster_name": cluster_name
-    })
+    return templates.TemplateResponse(
+        request,
+        "databases.html",
+        {"cluster_name": cluster_name}
+    )

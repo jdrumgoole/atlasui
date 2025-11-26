@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     timeout: int = 30
     max_retries: int = 3
 
+    # User Preferences
+    preferred_cloud_provider: Optional[str] = None  # AWS, GCP, AZURE
+    preferred_region: Optional[str] = None  # e.g., US_EAST_1, EU_WEST_1
+
     @property
     def atlas_api_base_url(self) -> str:
         """Get the full Atlas API base URL."""

@@ -9,12 +9,15 @@ from pymongo import MongoClient
 from pymongo.errors import OperationFailure, ServerSelectionTimeoutError, ConnectionFailure, ConfigurationError
 import urllib.parse
 import time
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from atlasui.client import AtlasClient
 from atlasui.session_manager import get_session_manager
 from atlasui.operations_manager import get_operation_manager, OperationType
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 # Simple cache for cluster listings (TTL: 30 seconds)
 _cluster_cache = {}
@@ -29,12 +32,16 @@ class ClusterLoginRequest(BaseModel):
 
 
 @router.post("/login")
+@limiter.limit("10/minute")
 async def login_to_cluster(
-    request: ClusterLoginRequest,
+    request: Request,
+    login_request: ClusterLoginRequest,
     response: Response
 ) -> Dict[str, Any]:
     """
     Login to a cluster with credentials and list databases.
+
+    Rate limited to 10 requests per minute to prevent brute force attacks.
 
     This creates a persistent session that maintains the MongoDB connection
     for the duration of the user's session (default: 60 minutes).
@@ -52,12 +59,12 @@ async def login_to_cluster(
     Returns:
         Session info and list of databases on the cluster
     """
-    connection_string = request.connection_string.strip()
+    connection_string = login_request.connection_string.strip()
 
     # URL-encode username and password to handle special characters
     # This is the recommended approach per PyMongo documentation
-    encoded_username = urllib.parse.quote_plus(request.username)
-    encoded_password = urllib.parse.quote_plus(request.password)
+    encoded_username = urllib.parse.quote_plus(login_request.username)
+    encoded_password = urllib.parse.quote_plus(login_request.password)
 
     # Parse and build the authenticated connection string
     # Remove any existing credentials from the connection string
@@ -141,17 +148,19 @@ async def login_to_cluster(
         session_id = session_manager.create_session(
             client=client,
             cluster_name=cluster_name,
-            username=request.username,
+            username=login_request.username,
             connection_string=sanitized_url
         )
 
-        # Set session cookie
+        # Set session cookie with security flags
+        # Note: secure=True requires HTTPS in production (localhost exempt for development)
         response.set_cookie(
             key="mongodb_session_id",
             value=session_id,
-            httponly=True,
+            httponly=True,  # Prevents JavaScript access
+            secure=True,    # Only send over HTTPS (browsers allow localhost exception)
+            samesite="strict",  # Strict CSRF protection
             max_age=3600,  # 1 hour
-            samesite="lax"
         )
 
         return {
@@ -477,6 +486,87 @@ async def delete_cluster(project_id: str, cluster_name: str) -> Dict[str, Any]:
         "message": f"Cluster deletion queued for {cluster_name}",
         "cluster_name": cluster_name
     }
+
+
+@router.post("/{project_id}/{cluster_name}/pause")
+async def pause_cluster(project_id: str, cluster_name: str) -> Dict[str, Any]:
+    """
+    Pause a cluster.
+
+    Pausing a cluster stops compute but preserves data. This reduces costs
+    while maintaining your data and cluster configuration.
+
+    Only dedicated clusters (M10+) can be paused.
+    M0 (Free Tier) and Flex clusters cannot be paused.
+
+    Args:
+        project_id: MongoDB Atlas project ID
+        cluster_name: Cluster name
+
+    Returns:
+        Updated cluster details
+    """
+    try:
+        async with AtlasClient() as client:
+            result = await client.pause_cluster(project_id, cluster_name)
+            return {
+                "success": True,
+                "message": f"Cluster {cluster_name} is being paused",
+                "cluster": result
+            }
+    except Exception as e:
+        error_msg = str(e)
+        if "M0" in error_msg or "free tier" in error_msg.lower():
+            raise HTTPException(
+                status_code=400,
+                detail="M0 (Free Tier) clusters cannot be paused"
+            )
+        elif "Flex" in error_msg:
+            raise HTTPException(
+                status_code=400,
+                detail="Flex clusters cannot be paused"
+            )
+        elif "404" in error_msg:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Cluster {cluster_name} not found in project {project_id}"
+            )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{project_id}/{cluster_name}/resume")
+async def resume_cluster(project_id: str, cluster_name: str) -> Dict[str, Any]:
+    """
+    Resume a paused cluster.
+
+    After resuming a cluster, you cannot pause it again for 60 minutes.
+    The client should track this cooldown period.
+
+    Args:
+        project_id: MongoDB Atlas project ID
+        cluster_name: Cluster name
+
+    Returns:
+        Updated cluster details with resume timestamp for cooldown tracking
+    """
+    try:
+        async with AtlasClient() as client:
+            result = await client.resume_cluster(project_id, cluster_name)
+            return {
+                "success": True,
+                "message": f"Cluster {cluster_name} is being resumed",
+                "cluster": result,
+                "resumed_at": time.time(),  # Unix timestamp for 60-min cooldown tracking
+                "cooldown_ends_at": time.time() + 3600  # 60 minutes from now
+            }
+    except Exception as e:
+        error_msg = str(e)
+        if "404" in error_msg:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Cluster {cluster_name} not found in project {project_id}"
+            )
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/session/status")

@@ -21,7 +21,7 @@ def test_cluster_lifecycle_smoke(page: Page, atlasui_server):
     This test validates the test infrastructure works without
     waiting for the full 10-20 minute cluster lifecycle.
     """
-    base_url = "http://localhost:8000"
+    base_url = "http://localhost:8100"
 
     print("\n" + "="*80)
     print("SMOKE TEST: Cluster Lifecycle Infrastructure")

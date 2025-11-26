@@ -32,7 +32,7 @@ The following long-running operations are managed through the queue:
 * **Create Project**: Creating new MongoDB Atlas projects within an organization
 * **Create Cluster**: Creating new MongoDB clusters (M0, Flex, M10, M30, etc.)
 * **Delete Cluster**: Removing clusters from a project
-* **Delete Project**: Cascading deletion of projects with all associated clusters (includes automatic deletion of all associated clusters)
+* **Delete Project**: Cascading deletion of projects with all associated clusters (includes automatic deletion of all associated clusters, both regular and Flex clusters)
 
 ### Auto-Refresh on Completion
 
@@ -44,6 +44,66 @@ The UI automatically refreshes resource lists when operations complete:
 * **Cluster deletion**: Deleted clusters are immediately removed from the list (optimistic update)
 
 This eliminates the need for manual page refreshes while maintaining a responsive user experience.
+
+## Cluster Pause/Resume
+
+AtlasUI allows you to pause and resume dedicated clusters (M10+) to save costs when they are not in use.
+
+### How It Works
+
+Pausing a cluster stops the compute resources while preserving your data:
+
+* **Data Preserved**: All your databases, collections, and indexes remain intact
+* **Cost Savings**: You only pay for storage while the cluster is paused
+* **Quick Resume**: Resume the cluster when you need it again
+
+### Pause Restrictions
+
+Not all clusters can be paused:
+
+* **M0 (Free Tier)**: Cannot be paused (always running)
+* **Flex Clusters**: Cannot be paused (managed automatically)
+* **Dedicated (M10+)**: Full pause/resume support
+
+### Status-Based State Transitions
+
+When pausing or resuming a cluster, the UI waits for the actual state change before updating the button:
+
+* **Pausing**: After clicking Pause, the status shows "PAUSING" and the button shows a spinner. The UI polls the cluster API every 5 seconds until the cluster reaches the PAUSED state, then switches the button to "Resume".
+* **Resuming**: After clicking Resume, the status shows "RESUMING" and the button shows a spinner. The UI polls the cluster API every 5 seconds until the cluster reaches the IDLE state, then shows the countdown timer.
+
+This ensures the UI accurately reflects the actual cluster state rather than assuming the operation completed immediately.
+
+### 60-Minute Cooldown
+
+After resuming a cluster, MongoDB Atlas enforces a 60-minute cooldown period before you can pause it again. AtlasUI tracks this cooldown:
+
+* A countdown timer replaces the Pause button after resume (once IDLE state is confirmed)
+* The timer shows MM:SS format with "Until next pause" label (e.g., "59:45" / "Until next pause")
+* The countdown persists across page refreshes (stored in localStorage)
+* Once the timer reaches zero, the Pause button becomes available again
+
+### Usage
+
+1. Navigate to the All Clusters page
+2. Find the cluster you want to pause (must be M10 or larger)
+3. Click the **Pause** button (yellow outline)
+4. Wait for the cluster status to change to **PAUSED** (status shows PAUSING during transition)
+5. The button changes to **Resume** once the cluster is fully paused
+6. Click **Resume** when you need the cluster again
+7. Wait for the cluster status to change to **IDLE** (status shows RESUMING during transition)
+8. The countdown timer appears with "Until next pause" label
+9. Wait for the 60-minute cooldown to pause again
+
+### API Endpoints
+
+The following REST API endpoints are available:
+
+* `POST /api/clusters/{project_id}/{cluster_name}/pause` - Pause a cluster
+* `POST /api/clusters/{project_id}/{cluster_name}/resume` - Resume a cluster
+* `GET /api/clusters/{project_id}/{cluster_name}` - Get cluster status for polling
+
+Both pause/resume endpoints return the updated cluster details.
 
 ## Flex Cluster Support
 

@@ -24,7 +24,7 @@ import argparse
 def check_server_running():
     """Check if AtlasUI server is running."""
     try:
-        response = requests.get("http://localhost:8000", timeout=5)
+        response = requests.get("http://localhost:8100", timeout=5)
         return True
     except requests.exceptions.RequestException:
         return False
@@ -116,7 +116,7 @@ to complete before deleting them.
     # Check if server is running
     print("Checking if AtlasUI server is running...")
     if not check_server_running():
-        print("❌ Error: AtlasUI server is not running on port 8000")
+        print("❌ Error: AtlasUI server is not running on port 8100")
         print("   Please start the server first:")
         print("     uv run atlasui start")
         print("   or")

@@ -56,6 +56,28 @@ class Operation:
         self.queued_at = datetime.utcnow()
         self.started_at: Optional[datetime] = None
         self.completed_at: Optional[datetime] = None
+        # Track complete history of status changes with timestamps
+        self.status_history: List[Dict[str, Any]] = []
+        self._add_history_entry("queued", "Operation queued")
+
+    def _add_history_entry(self, status: str, message: str):
+        """Add an entry to the status history"""
+        self.status_history.append({
+            "timestamp": datetime.utcnow().isoformat(),
+            "status": status,
+            "message": message
+        })
+
+    def update_status(self, status: OperationStatus, message: Optional[str] = None):
+        """Update status and add to history"""
+        self.status = status
+        if message:
+            self._add_history_entry(status.value, message)
+
+    def update_progress(self, message: str):
+        """Update progress and add to history"""
+        self.progress = message
+        self._add_history_entry(self.status.value, message)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert operation to dictionary for JSON serialization"""
@@ -71,6 +93,7 @@ class Operation:
             "queuedAt": self.queued_at.isoformat() if self.queued_at else None,
             "startedAt": self.started_at.isoformat() if self.started_at else None,
             "completedAt": self.completed_at.isoformat() if self.completed_at else None,
+            "statusHistory": self.status_history,
         }
 
 
@@ -240,7 +263,7 @@ class OperationManager:
     async def _process_operation(self, operation: Operation):
         """Process a single operation"""
         try:
-            operation.status = OperationStatus.IN_PROGRESS
+            operation.update_status(OperationStatus.IN_PROGRESS, "Operation started")
             operation.started_at = datetime.utcnow()
 
             # Log operation start with details
@@ -266,7 +289,7 @@ class OperationManager:
             else:
                 raise ValueError(f"Unknown operation type: {operation.type}")
 
-            operation.status = OperationStatus.COMPLETED
+            operation.update_status(OperationStatus.COMPLETED, "Operation completed successfully")
             operation.completed_at = datetime.utcnow()
 
             # Calculate duration
@@ -283,7 +306,7 @@ class OperationManager:
             await self._notify_listeners("completed", operation)
 
         except Exception as e:
-            operation.status = OperationStatus.FAILED
+            operation.update_status(OperationStatus.FAILED, f"Operation failed: {str(e)}")
             operation.error = str(e)
             operation.completed_at = datetime.utcnow()
 
@@ -312,7 +335,7 @@ class OperationManager:
             cluster_name = result.get("name")
 
         # Poll for completion
-        operation.progress = "Waiting for cluster to become available..."
+        operation.update_progress("Waiting for cluster to become available...")
         await self._notify_listeners("progress", operation)
 
         await self._poll_cluster_status(
@@ -334,7 +357,7 @@ class OperationManager:
             cluster_name = result.get("name")
 
         # Poll for completion
-        operation.progress = "Waiting for Flex cluster to become available..."
+        operation.update_progress("Waiting for Flex cluster to become available...")
         await self._notify_listeners("progress", operation)
 
         # Flex clusters might have different states, but usually go to IDLE
@@ -365,7 +388,7 @@ class OperationManager:
                     raise
 
         # Poll until cluster is gone
-        operation.progress = "Waiting for cluster to be deleted..."
+        operation.update_progress("Waiting for cluster to be deleted...")
         await self._notify_listeners("progress", operation)
 
         await self._poll_cluster_deletion(project_id, cluster_name, operation)
@@ -381,7 +404,7 @@ class OperationManager:
             operation.result = result
 
         # Poll until cluster is gone
-        operation.progress = "Waiting for Flex cluster to be deleted..."
+        operation.update_progress("Waiting for Flex cluster to be deleted...")
         await self._notify_listeners("progress", operation)
 
         await self._poll_flex_cluster_deletion(project_id, cluster_name, operation)
@@ -402,7 +425,7 @@ class OperationManager:
                     cluster = await client.get_cluster(project_id, cluster_name)
 
                 state = cluster.get("stateName", "UNKNOWN")
-                operation.progress = f"Cluster state: {state}"
+                operation.update_progress(f"Cluster state: {state}")
                 await self._notify_listeners("progress", operation)
 
                 if state == target_state:
@@ -437,7 +460,7 @@ class OperationManager:
                     cluster = await client.get_flex_cluster(project_id, cluster_name)
 
                 state = cluster.get("stateName", "UNKNOWN")
-                operation.progress = f"Flex cluster state: {state}"
+                operation.update_progress(f"Flex cluster state: {state}")
                 await self._notify_listeners("progress", operation)
 
                 if state == target_state:
@@ -470,7 +493,7 @@ class OperationManager:
                     cluster = await client.get_cluster(project_id, cluster_name)
 
                 state = cluster.get("stateName", "UNKNOWN")
-                operation.progress = f"Deleting cluster... (state: {state})"
+                operation.update_progress(f"Deleting cluster... (state: {state})")
                 await self._notify_listeners("progress", operation)
 
                 await asyncio.sleep(poll_interval)
@@ -499,7 +522,7 @@ class OperationManager:
                     cluster = await client.get_flex_cluster(project_id, cluster_name)
 
                 state = cluster.get("stateName", "UNKNOWN")
-                operation.progress = f"Deleting Flex cluster... (state: {state})"
+                operation.update_progress(f"Deleting Flex cluster... (state: {state})")
                 await self._notify_listeners("progress", operation)
 
                 await asyncio.sleep(poll_interval)
@@ -522,71 +545,157 @@ class OperationManager:
             result = await client.create_project(name=name, org_id=org_id)
             operation.result = result
 
-        operation.progress = "Project created successfully"
+        operation.update_progress("Project created successfully")
         await self._notify_listeners("progress", operation)
 
     async def _process_delete_project(self, operation: Operation):
-        """Process project deletion with cascading cluster deletion"""
+        """Process project deletion with cascading cluster deletion (in parallel)"""
         project_id = operation.metadata["project_id"]
         project_name = operation.metadata.get("project_name", project_id)
         cluster_names = operation.metadata.get("clusters", [])
 
         async with AtlasClient() as client:
-            # Step 1: Delete all clusters if any exist
+            # Step 1: Delete all clusters if any exist (in parallel)
             if cluster_names:
-                operation.progress = f"Deleting {len(cluster_names)} cluster(s)..."
+                operation.update_progress(f"Deleting {len(cluster_names)} cluster(s) in parallel...")
                 await self._notify_listeners("progress", operation)
 
+                # Create deletion tasks for all clusters concurrently
+                deletion_tasks = []
                 for cluster_name in cluster_names:
-                    try:
-                        operation.progress = f"Deleting cluster: {cluster_name}"
-                        await self._notify_listeners("progress", operation)
+                    task = asyncio.create_task(
+                        self._delete_single_cluster(client, project_id, cluster_name, operation)
+                    )
+                    deletion_tasks.append(task)
 
-                        # Try regular cluster deletion first
-                        try:
-                            await client.delete_cluster(project_id, cluster_name)
-                        except Exception as e:
-                            error_msg = str(e)
-                            # If cluster is already being deleted, that's fine - continue
-                            if "already been requested for deletion" in error_msg:
-                                logger.info(f"Cluster {cluster_name} is already being deleted, skipping...")
-                            # If it fails with Flex cluster error, try Flex deletion
-                            elif "Flex cluster" in error_msg and "cannot be used in the Cluster API" in error_msg:
-                                try:
-                                    await client.delete_flex_cluster(project_id, cluster_name)
-                                except Exception as flex_e:
-                                    # If Flex deletion also fails with "already requested", that's also fine
-                                    if "already been requested for deletion" in str(flex_e):
-                                        logger.info(f"Flex cluster {cluster_name} is already being deleted, skipping...")
-                                    else:
-                                        raise
-                            else:
-                                raise
+                # Wait for all cluster deletions to complete
+                try:
+                    results = await asyncio.gather(*deletion_tasks, return_exceptions=True)
 
-                        # Poll until cluster is deleted
-                        operation.progress = f"Waiting for cluster {cluster_name} to be deleted..."
-                        await self._notify_listeners("progress", operation)
+                    # Check if any deletions failed
+                    failed_clusters = []
+                    for i, result in enumerate(results):
+                        if isinstance(result, Exception):
+                            failed_clusters.append(f"{cluster_names[i]}: {result}")
 
-                        await self._poll_cluster_deletion_simple(client, project_id, cluster_name)
+                    if failed_clusters:
+                        raise Exception(f"Failed to delete clusters: {'; '.join(failed_clusters)}")
 
-                        logger.info(f"Cluster {cluster_name} deleted successfully")
+                except Exception as e:
+                    logger.error(f"Error during parallel cluster deletion: {e}")
+                    raise
 
-                    except Exception as e:
-                        logger.error(f"Failed to delete cluster {cluster_name}: {e}")
-                        raise Exception(f"Failed to delete cluster {cluster_name}: {e}")
+                # Step 1.5: Poll project to verify all clusters are actually gone
+                operation.update_progress("Verifying all clusters are deleted...")
+                await self._notify_listeners("progress", operation)
 
-                operation.progress = "All clusters deleted"
+                await self._poll_project_clusters_gone(client, project_id, operation)
+
+                operation.update_progress("All clusters deleted")
                 await self._notify_listeners("progress", operation)
 
             # Step 2: Delete the project
-            operation.progress = "Deleting project..."
+            operation.update_progress("Deleting project...")
             await self._notify_listeners("progress", operation)
 
             result = await client.delete_project(project_id)
             operation.result = result
 
-        operation.progress = "Project deleted successfully"
+        operation.update_progress("Project deleted successfully")
         await self._notify_listeners("progress", operation)
+
+    async def _delete_single_cluster(
+        self,
+        client: AtlasClient,
+        project_id: str,
+        cluster_name: str,
+        operation: Operation
+    ):
+        """Delete a single cluster (helper for parallel deletion)"""
+        try:
+            logger.info(f"Initiating deletion of cluster: {cluster_name}")
+
+            # Try regular cluster deletion first
+            try:
+                await client.delete_cluster(project_id, cluster_name)
+            except Exception as e:
+                error_msg = str(e)
+                # If cluster is already being deleted, that's fine - continue
+                if "already been requested for deletion" in error_msg:
+                    logger.info(f"Cluster {cluster_name} is already being deleted, skipping...")
+                # If it fails with Flex cluster error, try Flex deletion
+                elif "Flex cluster" in error_msg and "cannot be used in the Cluster API" in error_msg:
+                    try:
+                        await client.delete_flex_cluster(project_id, cluster_name)
+                    except Exception as flex_e:
+                        # If Flex deletion also fails with "already requested", that's also fine
+                        if "already been requested for deletion" in str(flex_e):
+                            logger.info(f"Flex cluster {cluster_name} is already being deleted, skipping...")
+                        else:
+                            raise
+                else:
+                    raise
+
+            # Poll until cluster is deleted
+            await self._poll_cluster_deletion_simple(client, project_id, cluster_name)
+
+            logger.info(f"Cluster {cluster_name} deleted successfully")
+
+        except Exception as e:
+            logger.error(f"Failed to delete cluster {cluster_name}: {e}")
+            raise Exception(f"Failed to delete cluster {cluster_name}: {e}")
+
+    async def _poll_project_clusters_gone(
+        self,
+        client: AtlasClient,
+        project_id: str,
+        operation: Operation,
+        max_attempts: int = 180,
+        poll_interval: int = 5
+    ):
+        """Poll project until all clusters are gone (empty list)"""
+        logger.info(f"Polling project {project_id} to verify all clusters are deleted")
+
+        for attempt in range(max_attempts):
+            try:
+                # List all clusters in the project
+                clusters_data = await client.list_clusters(project_id)
+                clusters = clusters_data.get("results", [])
+
+                # Also check Flex clusters
+                try:
+                    flex_clusters_data = await client.list_flex_clusters(project_id)
+                    flex_clusters = flex_clusters_data.get("results", [])
+                except Exception:
+                    flex_clusters = []
+
+                total_clusters = len(clusters) + len(flex_clusters)
+
+                if total_clusters == 0:
+                    logger.info(f"All clusters removed from project {project_id}")
+                    return
+
+                # Update progress with cluster count
+                cluster_names = [c.get("name", "unknown") for c in clusters]
+                flex_cluster_names = [c.get("name", "unknown") for c in flex_clusters]
+                all_names = cluster_names + flex_cluster_names
+
+                logger.info(f"Project {project_id} still has {total_clusters} cluster(s): {', '.join(all_names)}")
+                operation.update_progress(f"Waiting for {total_clusters} cluster(s) to be fully deleted: {', '.join(all_names[:3])}{'...' if len(all_names) > 3 else ''}")
+                await self._notify_listeners("progress", operation)
+
+                await asyncio.sleep(poll_interval)
+
+            except Exception as e:
+                error_msg = str(e)
+                # If we get a 404 on the project itself, that's unexpected but might mean it was deleted
+                if "404" in error_msg:
+                    logger.warning(f"Project {project_id} returned 404 during cluster verification")
+                    return
+                logger.warning(f"Error checking clusters for project {project_id}: {e}")
+                await asyncio.sleep(poll_interval)
+
+        raise Exception(f"Timeout waiting for all clusters to be removed from project {project_id}")
 
     async def _poll_cluster_deletion_simple(
         self,

@@ -200,6 +200,7 @@ class OperationQueueUI {
         this.manager = manager;
         this.panel = null;
         this.isExpanded = false;
+        this.isMaximized = false;
         this.autoScroll = true;
         this.init();
     }
@@ -273,6 +274,9 @@ class OperationQueueUI {
                         </span>
                     </div>
                     <div>
+                        <button class="btn btn-sm btn-link text-white" onclick="event.stopPropagation(); operationQueueUI.toggleMaximize()" title="Maximize/Restore">
+                            <i class="bi bi-arrows-fullscreen" id="opQueueMaximizeIcon"></i>
+                        </button>
                         <button class="btn btn-sm btn-link text-white" onclick="event.stopPropagation(); operationQueueUI.clearCompleted()">
                             <i class="bi bi-trash"></i> Clear
                         </button>
@@ -333,6 +337,11 @@ class OperationQueueUI {
                 overflow-y: auto;
                 overflow-x: hidden;
                 padding: 10px 20px;
+                transition: max-height 0.3s ease;
+            }
+
+            .operation-queue-panel.maximized .operation-queue-body {
+                max-height: calc(80vh - 50px);
             }
 
             .operation-list {
@@ -401,44 +410,76 @@ class OperationQueueUI {
                 flex-shrink: 0;
             }
 
-            .operation-status {
-                font-size: 11px;
-                text-transform: uppercase;
-                font-weight: 600;
-                letter-spacing: 0.5px;
+            .operation-status-banner {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 8px 12px;
+                margin: 8px 0;
+                border-radius: 4px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            .operation-status-banner.queued {
+                background-color: #fff3cd;
+                color: #856404;
+            }
+
+            .operation-status-banner.in-progress {
+                background-color: #cfe2ff;
+                color: #084298;
+            }
+
+            .operation-status-banner.completed {
+                background-color: #d1e7dd;
+                color: #0f5132;
+            }
+
+            .operation-status-banner.failed {
+                background-color: #f8d7da;
+                color: #842029;
+            }
+
+            .operation-status-banner .status-icon {
+                font-size: 16px;
+            }
+
+            .operation-history {
+                font-size: 12px;
+                margin-top: 8px;
+                max-height: 200px;
+                overflow-y: auto;
+            }
+
+            .status-history-entry {
+                display: flex;
+                align-items: flex-start;
+                gap: 8px;
+                padding: 4px 0;
+                line-height: 1.4;
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }
+
+            .status-timestamp {
+                font-family: 'Courier New', monospace;
+                font-size: 10px;
+                opacity: 0.7;
                 white-space: nowrap;
                 flex-shrink: 0;
-                padding: 3px 8px;
-                border-radius: 4px;
-                margin-right: 10px;
+                min-width: 70px;
             }
 
-            .operation-status.status-queued {
-                background: rgba(255, 193, 7, 0.3);
-                color: #fff;
-                background-color: #ffc107;
-                border: 1px solid #ffc107;
+            .status-icon {
+                flex-shrink: 0;
+                display: flex;
+                align-items: center;
             }
 
-            .operation-status.status-in-progress {
-                background: rgba(13, 110, 253, 0.3);
-                color: #fff;
-                background-color: #0d6efd;
-                border: 1px solid #0d6efd;
-            }
-
-            .operation-status.status-completed {
-                background: rgba(25, 135, 84, 0.3);
-                color: #fff;
-                background-color: #28a745;
-                border: 1px solid #28a745;
-            }
-
-            .operation-status.status-failed {
-                background: rgba(220, 53, 69, 0.3);
-                color: #fff;
-                background-color: #dc3545;
-                border: 1px solid #dc3545;
+            .status-message {
+                flex: 1;
+                word-break: break-word;
             }
 
             .operation-clear-btn {
@@ -544,46 +585,79 @@ class OperationQueueUI {
                 this.resetAutoCollapse();
             }
 
-            // Refresh cluster list when cluster operations start (to show CREATING status) or complete/fail
-            // Note: We don't refresh on 'progress' to avoid constant reloading
+            // Handle cluster operations with targeted updates (no full reload)
             if ((event === 'started' || event === 'completed' || event === 'failed') && operation) {
-                const clusterOperationTypes = ['create_cluster', 'delete_cluster', 'create_flex_cluster', 'delete_flex_cluster'];
+                const createOperationTypes = ['create_cluster', 'create_flex_cluster'];
                 const deleteOperationTypes = ['delete_cluster', 'delete_flex_cluster'];
+                const clusterOperationTypes = [...createOperationTypes, ...deleteOperationTypes];
 
                 if (clusterOperationTypes.includes(operation.type)) {
-                    // Track delete operations to manually show DELETING status
+                    const projectId = operation.metadata?.project_id;
+                    const clusterName = operation.metadata?.cluster_name || operation.metadata?.cluster_config?.name;
+                    const isFlexCluster = operation.type.includes('flex');
+
+                    // Handle DELETE operations
                     if (deleteOperationTypes.includes(operation.type)) {
+                        console.log(`[SSE] Delete operation event: ${event}, projectId: ${projectId}, clusterName: ${clusterName}`);
+
                         if (event === 'started') {
-                            // Mark cluster as being deleted
-                            const projectId = operation.metadata?.project_id;
-                            const clusterName = operation.metadata?.cluster_name;
+                            // Mark cluster as being deleted (updates UI to show DELETING status)
                             if (projectId && clusterName && typeof window.markClusterDeleting === 'function') {
                                 window.markClusterDeleting(projectId, clusterName);
                             }
-                        } else if (event === 'completed' || event === 'failed') {
-                            // Unmark cluster as being deleted
-                            const projectId = operation.metadata?.project_id;
-                            const clusterName = operation.metadata?.cluster_name;
-                            if (projectId && clusterName && typeof window.unmarkClusterDeleting === 'function') {
-                                window.unmarkClusterDeleting(projectId, clusterName);
+                            // Update the row status to DELETING
+                            if (typeof window.updateClusterRowStatus === 'function') {
+                                const updated = window.updateClusterRowStatus(projectId, clusterName, 'DELETING');
+                                console.log(`[SSE] Updated row status to DELETING: ${updated}`);
                             }
+                        } else if (event === 'completed') {
+                            // Unmark and remove the row from the table
+                            if (projectId && clusterName) {
+                                if (typeof window.unmarkClusterDeleting === 'function') {
+                                    window.unmarkClusterDeleting(projectId, clusterName);
+                                }
+                                if (typeof window.removeClusterRow === 'function') {
+                                    const removed = window.removeClusterRow(projectId, clusterName);
+                                    console.log(`[SSE] Removed cluster row: ${removed}`);
+                                    // Fallback: if row wasn't found/removed, do a full refresh
+                                    if (!removed && typeof window.loadClusters === 'function') {
+                                        console.log(`[SSE] Row not found, falling back to full refresh`);
+                                        window.loadClusters();
+                                    }
+                                } else if (typeof window.loadClusters === 'function') {
+                                    // Fallback if removeClusterRow not available
+                                    window.loadClusters();
+                                }
+                            }
+                            console.log(`[SSE] Cluster deleted: ${clusterName}`);
+                        } else if (event === 'failed') {
+                            // Unmark and restore original status
+                            if (projectId && clusterName) {
+                                if (typeof window.unmarkClusterDeleting === 'function') {
+                                    window.unmarkClusterDeleting(projectId, clusterName);
+                                }
+                                // Refresh just this cluster to restore correct state
+                                if (typeof window.fetchAndUpdateCluster === 'function') {
+                                    window.fetchAndUpdateCluster(projectId, clusterName, isFlexCluster);
+                                } else if (typeof window.loadClusters === 'function') {
+                                    window.loadClusters();
+                                }
+                            }
+                            console.log(`[SSE] Cluster delete failed: ${clusterName}`);
                         }
                     }
-
-                    // Call loadClusters() if it exists (we're on the clusters page)
-                    // Only reload for CREATE operations - DELETE operations use optimistic removal
-                    if (typeof window.loadClusters === 'function') {
-                        const createOperationTypes = ['create_cluster', 'create_flex_cluster'];
-
-                        // Only reload for create operations (delete uses optimistic removal)
-                        if (event === 'completed' && createOperationTypes.includes(operation.type)) {
-                            console.log(`Cluster creation ${operation.type} completed, refreshing cluster list...`);
-                            window.loadClusters();
-                        }
-                        // For started create operations, refresh to show CREATING status
-                        else if (event === 'started' && createOperationTypes.includes(operation.type)) {
-                            console.log(`Cluster creation ${operation.type} started, refreshing cluster list...`);
-                            window.loadClusters();
+                    // Handle CREATE operations
+                    else if (createOperationTypes.includes(operation.type)) {
+                        if (event === 'started') {
+                            console.log(`[SSE] Cluster create started: ${clusterName}`);
+                        } else if (event === 'completed') {
+                            console.log(`[SSE] Cluster created: ${clusterName}, refreshing list...`);
+                            // Refresh the cluster list to show the new cluster with IDLE status
+                            if (typeof window.loadClusters === 'function') {
+                                window.loadClusters();
+                            }
+                        } else if (event === 'failed') {
+                            console.log(`[SSE] Cluster create failed: ${clusterName}`);
                         }
                     }
                 }
@@ -640,31 +714,22 @@ class OperationQueueUI {
         }
     }
 
+    formatTime(isoString) {
+        const date = new Date(isoString);
+        return date.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+    }
+
     renderOperation(op) {
-        const startedAt = op.startedAt ? new Date(op.startedAt) : null;
-        const completedAt = op.completedAt ? new Date(op.completedAt) : null;
-
-        const duration = completedAt && startedAt ?
-            ((completedAt - startedAt) / 1000).toFixed(1) + 's' : '';
-
-        const progress = op.progress ?
-            `<div class="operation-progress">${this.escapeHtml(op.progress)}</div>` : '';
-
-        const error = op.error ?
-            `<div class="operation-error"><i class="bi bi-exclamation-triangle"></i> ${this.escapeHtml(op.error)}</div>` : '';
-
-        const progressBar = op.status === 'in-progress' ?
-            `<div class="progress-bar-container"><div class="progress-bar indeterminate"></div></div>` : '';
-
-        // Show elapsed time for in-progress operations
-        const elapsedTime = (op.status === 'in-progress' && op.startedAt) ?
-            `<div class="operation-time">Elapsed: ${this.formatElapsedTime(op.startedAt)}</div>` : '';
-
         const statusIcon = {
-            'queued': '<i class="bi bi-clock-history"></i>',
-            'in-progress': '<i class="bi bi-arrow-repeat"></i>',
-            'completed': '<i class="bi bi-check-circle"></i>',
-            'failed': '<i class="bi bi-x-circle"></i>'
+            'queued': '<i class="bi bi-clock-history text-warning"></i>',
+            'in-progress': '<i class="bi bi-arrow-repeat text-info"></i>',
+            'completed': '<i class="bi bi-check-circle text-success"></i>',
+            'failed': '<i class="bi bi-x-circle text-danger"></i>'
         }[op.status] || '';
 
         // Show clear button for completed or failed operations
@@ -673,32 +738,61 @@ class OperationQueueUI {
                 <i class="bi bi-x"></i>
             </button>` : '';
 
-        // Update operation name text based on status (e.g., "Creating cluster" -> "Cluster created")
-        let displayName = op.name;
-        if (op.status === 'completed') {
-            displayName = displayName
-                .replace(/^Creating cluster:/i, 'Cluster created:')
-                .replace(/^Creating Flex cluster:/i, 'Flex cluster created:')
-                .replace(/^Deleting cluster:/i, 'Cluster deleted:')
-                .replace(/^Deleting Flex cluster:/i, 'Flex cluster deleted:')
-                .replace(/^Deleting project:/i, 'Project deleted:')
-                .replace(/^Creating project:/i, 'Project created:');
-        }
+        // Render status history with timestamps
+        const statusHistory = op.statusHistory && op.statusHistory.length > 0 ?
+            op.statusHistory.map(entry => {
+                const icon = {
+                    'queued': '<i class="bi bi-clock-history text-warning"></i>',
+                    'in-progress': '<i class="bi bi-arrow-repeat text-info"></i>',
+                    'completed': '<i class="bi bi-check-circle text-success"></i>',
+                    'failed': '<i class="bi bi-x-circle text-danger"></i>'
+                }[entry.status] || '';
+
+                return `
+                    <div class="status-history-entry">
+                        <span class="status-timestamp">${this.formatTime(entry.timestamp)}</span>
+                        <span class="status-icon">${icon}</span>
+                        <span class="status-message">${this.escapeHtml(entry.message)}</span>
+                    </div>
+                `;
+            }).join('')
+            : '<div class="text-muted">No history available</div>';
+
+        const progressBar = op.status === 'in-progress' ?
+            `<div class="progress-bar-container"><div class="progress-bar indeterminate"></div></div>` : '';
+
+        const error = op.error ?
+            `<div class="operation-error"><i class="bi bi-exclamation-triangle"></i> ${this.escapeHtml(op.error)}</div>` : '';
+
+        // Status banner with current status
+        const statusText = {
+            'queued': 'Queued',
+            'in-progress': 'In Progress',
+            'completed': 'Completed',
+            'failed': 'Failed'
+        }[op.status] || op.status;
+
+        const statusBanner = `
+            <div class="operation-status-banner ${op.status}">
+                <span class="status-icon">${statusIcon}</span>
+                <span class="status-text">${statusText}</span>
+            </div>
+        `;
 
         return `
             <div class="operation-item ${op.status}">
                 <div class="operation-header">
-                    <div class="operation-status status-${op.status}">${statusIcon} ${op.status}</div>
-                    <div class="operation-name">${this.escapeHtml(displayName)}</div>
+                    <div class="operation-name">${this.escapeHtml(op.name)}</div>
                     <div class="operation-actions">
                         ${clearButton}
                     </div>
                 </div>
-                ${progress}
+                ${statusBanner}
+                <div class="operation-history">
+                    ${statusHistory}
+                </div>
                 ${progressBar}
                 ${error}
-                ${elapsedTime}
-                ${duration ? `<div class="operation-time">Completed in ${duration}</div>` : ''}
             </div>
         `;
     }
@@ -760,6 +854,23 @@ class OperationQueueUI {
             console.log(`Operation ${operationId} cleared`);
         } else {
             console.error(`Failed to clear operation ${operationId}`);
+        }
+    }
+
+    toggleMaximize() {
+        this.isMaximized = !this.isMaximized;
+        const icon = document.getElementById('opQueueMaximizeIcon');
+
+        if (this.isMaximized) {
+            this.panel.classList.add('maximized');
+            icon.className = 'bi bi-fullscreen-exit';
+            // Ensure panel is expanded when maximizing
+            if (!this.isExpanded) {
+                this.expand();
+            }
+        } else {
+            this.panel.classList.remove('maximized');
+            icon.className = 'bi bi-arrows-fullscreen';
         }
     }
 }

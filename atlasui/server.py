@@ -5,15 +5,63 @@ FastAPI server for AtlasUI web interface.
 import asyncio
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from pathlib import Path
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 
 from atlasui.config import settings
 from atlasui.api import projects, clusters, alerts, backups, users, pages, organizations, databases, server, setup, operations
 from atlasui.session_manager import get_session_manager
 from atlasui.operations_manager import get_operation_manager
+
+# Rate limiter configuration
+limiter = Limiter(key_func=get_remote_address)
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Middleware to add security headers to all responses."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:
+        response = await call_next(request)
+
+        # Prevent MIME type sniffing
+        response.headers["X-Content-Type-Options"] = "nosniff"
+
+        # Prevent clickjacking
+        response.headers["X-Frame-Options"] = "DENY"
+
+        # XSS protection (legacy but still useful)
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+
+        # Control referrer information
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+        # Prevent caching of sensitive data
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+
+        # Content Security Policy - allow inline scripts for now (needed for templates)
+        # In production, consider using nonces for inline scripts
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "font-src 'self' https://cdn.jsdelivr.net; "
+            "img-src 'self' data:; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none';"
+        )
+
+        return response
 
 
 # Background task for cleaning up expired sessions
@@ -77,6 +125,23 @@ app = FastAPI(
     version=settings.app_version,
     description="MongoDB Atlas Administration UI",
     lifespan=lifespan,
+)
+
+# Add rate limiter to app state and exception handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# Add security headers middleware
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Add CORS middleware - restrict to same origin for security
+# Only allow requests from the same host
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:8000", "http://127.0.0.1:8000"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "DELETE", "PATCH", "PUT"],
+    allow_headers=["*"],
 )
 
 # Get paths

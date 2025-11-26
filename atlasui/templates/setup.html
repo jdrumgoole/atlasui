@@ -41,8 +41,37 @@
                     <h5 class="mb-3">Let's get you set up!</h5>
                     <p>This wizard will guide you through configuring AtlasUI to connect to your MongoDB Atlas account.</p>
 
+                    <!-- Load from File Option -->
+                    <div class="card mb-4 border-success">
+                        <div class="card-header bg-success text-white">
+                            <i class="bi bi-file-earmark-code"></i> Quick Setup: Load from File
+                        </div>
+                        <div class="card-body">
+                            <p class="small mb-2">Have a credentials file? Browse to select or enter the path.</p>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="credentialsFilePath"
+                                       placeholder="/path/to/credentials.json or click Browse">
+                                <input type="file" class="d-none" id="credentialsFileInput"
+                                       accept=".json,.env,.txt" onchange="handleFileSelect(event)">
+                                <button class="btn btn-outline-success" type="button" onclick="document.getElementById('credentialsFileInput').click()">
+                                    <i class="bi bi-folder2-open"></i> Browse
+                                </button>
+                                <button class="btn btn-success" type="button" onclick="loadCredentialsFromFile()">
+                                    <span class="spinner-border spinner-border-sm d-none" id="loadFileSpinner"></span>
+                                    <i class="bi bi-upload" id="loadFileIcon"></i> Load
+                                </button>
+                            </div>
+                            <div class="form-text">
+                                Supports JSON or .env files with API keys (public_key/private_key) or service account credentials (client_id/client_secret).
+                            </div>
+                            <div id="loadFileResult" class="mt-2" style="display: none;"></div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+
                     <div class="alert alert-info">
-                        <i class="bi bi-info-circle-fill"></i> <strong>What you'll need:</strong>
+                        <i class="bi bi-info-circle-fill"></i> <strong>Or set up manually. You'll need:</strong>
                         <ul class="mb-0 mt-2">
                             <li>A MongoDB Atlas account (<a href="https://cloud.mongodb.com" target="_blank">cloud.mongodb.com</a>)</li>
                             <li>API credentials (we'll show you how to get them)</li>
@@ -52,7 +81,7 @@
 
                     <div class="d-grid gap-2 mt-4">
                         <button class="btn btn-primary btn-lg" onclick="goToStep(2)">
-                            Get Started <i class="bi bi-arrow-right"></i>
+                            Manual Setup <i class="bi bi-arrow-right"></i>
                         </button>
                     </div>
                 </div>
@@ -326,6 +355,206 @@
 <script>
 let selectedAuthMethod = 'api_key';
 let currentStep = 1;
+let loadedFileContents = null;  // Store file contents when selected via browser
+
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const resultDiv = document.getElementById('loadFileResult');
+    document.getElementById('credentialsFilePath').value = file.name;
+
+    // Read file contents
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        loadedFileContents = e.target.result;
+        resultDiv.innerHTML = `<div class="alert alert-info py-2 mb-0"><i class="bi bi-check"></i> File loaded: ${file.name}. Click "Load" to configure.</div>`;
+        resultDiv.style.display = 'block';
+    };
+    reader.onerror = function() {
+        resultDiv.innerHTML = `<div class="alert alert-danger py-2 mb-0"><i class="bi bi-x-circle"></i> Error reading file</div>`;
+        resultDiv.style.display = 'block';
+        loadedFileContents = null;
+    };
+    reader.readAsText(file);
+}
+
+function parseCredentialsFromContent(content) {
+    // Try to parse as JSON first
+    try {
+        const data = JSON.parse(content);
+
+        // Check for service account credentials
+        if (data.client_id && data.client_secret) {
+            return {
+                success: true,
+                auth_method: 'service_account',
+                message: 'Found service account credentials',
+                credentials_found: {
+                    client_id: data.client_id,
+                    client_secret: data.client_secret,
+                    project_id: data.project_id || ''
+                }
+            };
+        }
+
+        // Check for API keys (various formats)
+        const publicKey = data.public_key || data.publicKey || data.ATLAS_PUBLIC_KEY;
+        const privateKey = data.private_key || data.privateKey || data.ATLAS_PRIVATE_KEY;
+
+        if (publicKey && privateKey) {
+            return {
+                success: true,
+                auth_method: 'api_key',
+                message: 'Found API key credentials',
+                credentials_found: {
+                    public_key: publicKey,
+                    private_key: privateKey
+                }
+            };
+        }
+
+        return { success: false, message: 'JSON file does not contain recognized credentials' };
+    } catch (e) {
+        // Not JSON, try parsing as .env format
+        const credentials = {};
+        content.split('\n').forEach(line => {
+            line = line.trim();
+            if (!line || line.startsWith('#')) return;
+            if (line.includes('=')) {
+                const [key, ...valueParts] = line.split('=');
+                const value = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
+                credentials[key.trim()] = value;
+            }
+        });
+
+        // Check for API keys
+        const publicKey = credentials.ATLAS_PUBLIC_KEY;
+        const privateKey = credentials.ATLAS_PRIVATE_KEY;
+
+        if (publicKey && privateKey) {
+            return {
+                success: true,
+                auth_method: 'api_key',
+                message: 'Found API key credentials',
+                credentials_found: {
+                    public_key: publicKey,
+                    private_key: privateKey
+                }
+            };
+        }
+
+        // Check for service account
+        const clientId = credentials.ATLAS_SERVICE_ACCOUNT_CLIENT_ID || credentials.ATLAS_SERVICE_ACCOUNT_ID;
+        const clientSecret = credentials.ATLAS_SERVICE_ACCOUNT_CLIENT_SECRET || credentials.ATLAS_SERVICE_ACCOUNT_SECRET;
+
+        if (clientId && clientSecret) {
+            return {
+                success: true,
+                auth_method: 'service_account',
+                message: 'Found service account credentials',
+                credentials_found: {
+                    client_id: clientId,
+                    client_secret: clientSecret,
+                    project_id: credentials.ATLAS_SERVICE_ACCOUNT_PROJECT_ID || ''
+                }
+            };
+        }
+
+        return { success: false, message: 'File does not contain recognized Atlas credentials' };
+    }
+}
+
+async function loadCredentialsFromFile() {
+    const filePath = document.getElementById('credentialsFilePath').value.trim();
+    const resultDiv = document.getElementById('loadFileResult');
+    const spinner = document.getElementById('loadFileSpinner');
+    const icon = document.getElementById('loadFileIcon');
+
+    if (!filePath && !loadedFileContents) {
+        resultDiv.innerHTML = '<div class="alert alert-warning py-2 mb-0"><i class="bi bi-exclamation-triangle"></i> Please select a file or enter a file path</div>';
+        resultDiv.style.display = 'block';
+        return;
+    }
+
+    // Show loading state
+    spinner.classList.remove('d-none');
+    icon.classList.add('d-none');
+    resultDiv.style.display = 'none';
+
+    try {
+        let loadData;
+
+        // If we have file contents from the browser file picker, parse locally
+        if (loadedFileContents) {
+            loadData = parseCredentialsFromContent(loadedFileContents);
+        } else {
+            // Otherwise, use the server API to read from file path
+            const loadResponse = await fetch('/api/setup/load-credentials-file', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ file_path: filePath })
+            });
+            loadData = await loadResponse.json();
+        }
+
+        if (!loadData.success) {
+            resultDiv.innerHTML = `<div class="alert alert-danger py-2 mb-0"><i class="bi bi-x-circle"></i> ${loadData.message}</div>`;
+            resultDiv.style.display = 'block';
+            return;
+        }
+
+        // Credentials found - now configure them
+        resultDiv.innerHTML = `<div class="alert alert-info py-2 mb-0"><i class="bi bi-hourglass-split"></i> ${loadData.message}. Configuring...</div>`;
+        resultDiv.style.display = 'block';
+
+        let configResponse;
+        if (loadData.auth_method === 'api_key') {
+            configResponse = await fetch('/api/setup/configure/api-key', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    public_key: loadData.credentials_found.public_key,
+                    private_key: loadData.credentials_found.private_key
+                })
+            });
+            selectedAuthMethod = 'api_key';
+        } else if (loadData.auth_method === 'service_account') {
+            configResponse = await fetch('/api/setup/configure/service-account', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    client_id: loadData.credentials_found.client_id,
+                    client_secret: loadData.credentials_found.client_secret,
+                    project_id: loadData.credentials_found.project_id || ''
+                })
+            });
+            selectedAuthMethod = 'service_account';
+        }
+
+        const configData = await configResponse.json();
+
+        if (!configResponse.ok) {
+            resultDiv.innerHTML = `<div class="alert alert-danger py-2 mb-0"><i class="bi bi-x-circle"></i> Configuration failed: ${configData.detail || 'Unknown error'}</div>`;
+            resultDiv.style.display = 'block';
+            return;
+        }
+
+        // Success - test connection and go to completion
+        resultDiv.innerHTML = `<div class="alert alert-success py-2 mb-0"><i class="bi bi-check-circle"></i> Credentials loaded successfully! Testing connection...</div>`;
+        resultDiv.style.display = 'block';
+
+        // Test connection and go to step 4
+        await testConnection();
+
+    } catch (err) {
+        resultDiv.innerHTML = `<div class="alert alert-danger py-2 mb-0"><i class="bi bi-x-circle"></i> Error: ${err.message}</div>`;
+        resultDiv.style.display = 'block';
+    } finally {
+        spinner.classList.add('d-none');
+        icon.classList.remove('d-none');
+    }
+}
 
 function goToStep(step) {
     // Hide all steps

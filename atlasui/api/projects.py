@@ -111,25 +111,36 @@ async def delete_project(
             except Exception:
                 pass  # If we can't get the name, use the ID
 
-            # Check for clusters in the project
+            # Check for clusters in the project (both regular and Flex)
             clusters = []
+            flex_clusters = []
             try:
                 clusters_data = await client.list_clusters(project_id)
                 clusters = clusters_data.get("results", [])
             except Exception:
                 pass  # If we can't list clusters, proceed anyway
 
+            # Also check for Flex clusters (they use a separate API endpoint)
+            try:
+                flex_clusters_data = await client.list_flex_clusters(project_id)
+                flex_clusters = flex_clusters_data.get("results", [])
+            except Exception:
+                pass  # If we can't list Flex clusters, proceed anyway
+
+            # Combine both types
+            all_clusters = clusters + flex_clusters
+
             # If not confirmed, require confirmation (always, regardless of clusters)
             if not confirmed:
                 cluster_info = []
-                for cluster in clusters:
+                for cluster in all_clusters:
                     cluster_info.append({
                         "name": cluster.get("name"),
                         "type": cluster.get("clusterType", "REPLICASET"),
                         "state": cluster.get("stateName", "UNKNOWN")
                     })
 
-                message = f"This project contains {len(clusters)} cluster(s). All clusters will be deleted." if clusters else "This project will be permanently deleted."
+                message = f"This project contains {len(all_clusters)} cluster(s). All clusters will be deleted." if all_clusters else "This project will be permanently deleted."
 
                 return {
                     "confirmation_required": True,
@@ -142,7 +153,7 @@ async def delete_project(
         from atlasui.operations_manager import get_operation_manager, OperationType
         manager = get_operation_manager()
 
-        cluster_names = [c.get("name") for c in clusters] if clusters else []
+        cluster_names = [c.get("name") for c in all_clusters] if all_clusters else []
 
         operation_id = manager.queue_operation(
             type=OperationType.DELETE_PROJECT,

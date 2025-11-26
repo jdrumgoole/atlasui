@@ -50,7 +50,7 @@ def test_create_cluster(page: Page, atlasui_server):
     print("="*80)
 
     # Navigate to the application
-    base_url = "http://localhost:8000"
+    base_url = "http://localhost:8100"
     print(f"\n1. Navigating to {base_url}")
     page.goto(base_url)
 

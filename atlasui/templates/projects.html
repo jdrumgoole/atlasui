@@ -311,7 +311,7 @@ function renderProjects() {
                 </a>
             </td>
             <td>
-                <a href="/clusters" class="text-decoration-none">
+                <a href="/clusters?project=${encodeURIComponent(project.name)}" class="text-decoration-none">
                     <span class="badge bg-primary">${project.clusterCount || 0}</span>
                 </a>
             </td>

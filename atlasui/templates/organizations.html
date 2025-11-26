@@ -72,7 +72,7 @@
     }
 
     .hierarchy-tree {
-        font-size: 15px;
+        font-size: 18px;
     }
 
     .tree-node {
@@ -99,10 +99,11 @@
     }
 
     .tree-expand-icon {
-        width: 20px;
+        width: 24px;
         text-align: center;
         transition: transform 0.2s;
         cursor: pointer;
+        font-size: 18px;
     }
 
     .tree-expand-icon.expanded {
@@ -110,8 +111,9 @@
     }
 
     .tree-node-icon {
-        width: 24px;
+        width: 28px;
         text-align: center;
+        font-size: 20px;
     }
 
     .tree-node-name {
@@ -131,8 +133,8 @@
     }
 
     .tree-node-badge {
-        font-size: 11px;
-        padding: 2px 8px;
+        font-size: 14px;
+        padding: 3px 10px;
     }
 
     .tree-node-children {
@@ -158,7 +160,7 @@
 
     .tree-node-info {
         margin-left: 52px;
-        font-size: 12px;
+        font-size: 15px;
         color: #6c757d;
         margin-top: 4px;
     }
@@ -344,6 +346,9 @@ function createProjectNode(project, org) {
 
     const clusterCount = project.clusters ? project.clusters.length : 0;
 
+    const orgName = org ? encodeURIComponent(org.name || org.id) : '';
+    const projectUrl = orgName ? `/organizations/${orgName}/projects` : '/projects';
+
     node.innerHTML = `
         <div class="tree-node-header">
             <span class="tree-expand-icon ${clusterCount > 0 ? '' : 'invisible'}">
@@ -352,10 +357,10 @@ function createProjectNode(project, org) {
             <span class="tree-node-icon">
                 <i class="bi bi-folder text-primary"></i>
             </span>
-            <a href="/projects/${encodeURIComponent(project.name)}" class="tree-node-link">
+            <a href="${projectUrl}" class="tree-node-link">
                 <span class="tree-node-name">${project.name}</span>
             </a>
-            <a href="/projects/${encodeURIComponent(project.name)}" style="text-decoration: none;">
+            <a href="/clusters" style="text-decoration: none;">
                 <span class="badge bg-primary tree-node-badge">${clusterCount} clusters</span>
             </a>
         </div>
@@ -399,7 +404,9 @@ function createClusterNode(cluster) {
             <span class="tree-node-icon">
                 <i class="bi bi-hdd-rack text-success"></i>
             </span>
-            <span class="tree-node-name">${cluster.name}</span>
+            <a href="/clusters" class="tree-node-link">
+                <span class="tree-node-name">${cluster.name}</span>
+            </a>
             ${replicaSetBadge}
         </div>
         <div class="tree-node-info">

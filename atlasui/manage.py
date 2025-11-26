@@ -248,12 +248,6 @@ Examples:
   atlasui status
   atlasui restart
 
-  # Or using invoke tasks:
-  inv start
-  inv stop
-  inv restart
-  inv status
-
 atlasui version {__version__}
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter

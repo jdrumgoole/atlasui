@@ -47,7 +47,23 @@ async def shutdown_server() -> Dict[str, Any]:
 async def shutdown_after_delay():
     """Wait a moment then shutdown the server."""
     import asyncio
+    from pathlib import Path
+
     await asyncio.sleep(0.5)  # Give time for response to be sent
 
-    # Send SIGTERM to this process to trigger graceful shutdown
-    os.kill(os.getpid(), signal.SIGTERM)
+    # Read the PID from the PID file if it exists
+    pid_file = Path("atlasui.pid")
+    if pid_file.exists():
+        try:
+            # Get the main server process PID from the PID file
+            main_pid = int(pid_file.read_text().strip())
+            print(f"Killing main server process (PID: {main_pid})")
+            os.kill(main_pid, signal.SIGTERM)
+        except (ValueError, OSError, ProcessLookupError) as e:
+            print(f"Failed to kill main process from PID file: {e}")
+            # Fallback to killing current process
+            os.kill(os.getpid(), signal.SIGTERM)
+    else:
+        # No PID file, just kill the current process
+        print(f"No PID file found, killing current process (PID: {os.getpid()})")
+        os.kill(os.getpid(), signal.SIGTERM)

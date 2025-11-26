@@ -38,8 +38,30 @@
                     <thead>
                         <tr>
                             <th>Name</th>
-                            <th>Organization</th>
-                            <th>Project</th>
+                            <th>
+                                Project
+                                <div class="btn-group" style="margin-left: 5px; display: inline-block;">
+                                    <button class="btn btn-sm btn-link p-0" type="button" id="projectFilterBtn" data-bs-toggle="dropdown" aria-expanded="false" title="Filter projects" style="color: inherit;">
+                                        <i class="bi bi-funnel" id="projectFilterIcon"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end" id="projectFilterDropdown" style="max-height: 400px; overflow-y: auto; min-width: 250px;">
+                                        <li class="px-3 py-2 border-bottom">
+                                            <div class="d-flex justify-content-between">
+                                                <button class="btn btn-sm btn-link p-0" onclick="selectAllProjects()">Select All</button>
+                                                <button class="btn btn-sm btn-link p-0" onclick="clearAllProjects()">Clear All</button>
+                                            </div>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li class="px-3 py-1">
+                                            <input type="text" class="form-control form-control-sm" id="projectSearchBox" placeholder="Search projects...">
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <div id="projectFilterList" style="max-height: 300px; overflow-y: auto;">
+                                            <!-- Project checkboxes will be inserted here -->
+                                        </div>
+                                    </ul>
+                                </div>
+                            </th>
                             <th>Status</th>
                             <th>Type</th>
                             <th>MongoDB</th>
@@ -460,10 +482,65 @@
     .fade-in {
         animation: fadeIn 0.5s ease-in;
     }
+
+    /* Pause/Resume button styles */
+    .pause-countdown {
+        font-size: 0.75rem;
+        min-width: 120px;
+        text-align: center;
+    }
+
+    .pause-countdown .countdown-time {
+        font-family: monospace;
+        font-weight: bold;
+    }
+
+    .pause-countdown .countdown-label {
+        font-size: 0.65rem;
+        display: block;
+        margin-top: 2px;
+    }
+
+    /* Project filter dropdown styles */
+    #clustersTable .table-responsive {
+        overflow: visible !important;
+    }
+
+    /* Ensure the button group container is positioned relatively */
+    #clustersTable .btn-group {
+        position: relative;
+    }
+
+    #projectFilterDropdown {
+        padding: 0;
+        z-index: 1050 !important;
+        position: absolute !important;
+    }
+
+    #projectFilterDropdown .dropdown-item {
+        padding: 0.25rem 0;
+    }
+
+    #projectFilterDropdown .dropdown-item label {
+        width: 100%;
+        padding: 0.25rem 1rem;
+        margin: 0;
+    }
+
+    #projectFilterDropdown .dropdown-item label:hover {
+        background-color: #f8f9fa;
+    }
+
+    #projectFilterIcon.bi-funnel-fill {
+        color: #0d6efd !important;
+    }
 </style>
 
 <script>
 let clusters = [];
+let allClusters = []; // Store unfiltered list
+let selectedProjects = new Set(); // Track selected projects for filtering
+let allProjectNames = []; // All unique project names
 // Track clusters currently being deleted (key: "projectId:clusterName")
 const deletingClusters = new Set();
 
@@ -487,9 +564,755 @@ window.isClusterDeleting = function(projectId, clusterName) {
     return deletingClusters.has(key);
 };
 
+// Build project filter dropdown with checkboxes
+// Get URL parameter by name
+function getUrlParameter(name) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(name);
+}
+
+function buildProjectFilterDropdown() {
+    // Get unique project names
+    const projectNames = new Set();
+    allClusters.forEach(cluster => {
+        if (cluster.projectName) {
+            projectNames.add(cluster.projectName);
+        }
+    });
+
+    allProjectNames = Array.from(projectNames).sort();
+
+    // Initialize selectedProjects with all projects
+    selectedProjects = new Set(allProjectNames);
+
+    renderProjectFilterList(allProjectNames);
+}
+
+// Apply project filter from URL parameter if present
+function applyUrlProjectFilter() {
+    const projectFromUrl = getUrlParameter('project');
+    if (projectFromUrl && allProjectNames.includes(projectFromUrl)) {
+        // Clear all selections and select only the specified project
+        selectedProjects.clear();
+        selectedProjects.add(projectFromUrl);
+
+        // Re-render the filter list to update checkboxes
+        renderProjectFilterList(allProjectNames);
+
+        // Apply the filter to show only this project's clusters
+        applyProjectFilter();
+
+        console.log(`Applied URL filter for project: ${projectFromUrl}`);
+    }
+}
+
+function renderProjectFilterList(projectsToShow) {
+    const listContainer = document.getElementById('projectFilterList');
+    listContainer.innerHTML = '';
+
+    projectsToShow.forEach(projectName => {
+        const item = document.createElement('li');
+        item.className = 'dropdown-item';
+
+        const label = document.createElement('label');
+        label.className = 'd-flex align-items-center';
+        label.style.cursor = 'pointer';
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.className = 'form-check-input me-2';
+        checkbox.value = projectName;
+        checkbox.checked = selectedProjects.has(projectName);
+        checkbox.onchange = function() {
+            toggleProjectFilter(projectName, this.checked);
+        };
+
+        const text = document.createElement('span');
+        text.textContent = projectName;
+
+        label.appendChild(checkbox);
+        label.appendChild(text);
+        item.appendChild(label);
+        listContainer.appendChild(item);
+    });
+}
+
+function toggleProjectFilter(projectName, checked) {
+    if (checked) {
+        selectedProjects.add(projectName);
+    } else {
+        selectedProjects.delete(projectName);
+    }
+    applyProjectFilter();
+}
+
+function applyProjectFilter() {
+    if (selectedProjects.size === 0 || selectedProjects.size === allProjectNames.length) {
+        // No filter or all selected
+        clusters = [...allClusters];
+    } else {
+        // Filter by selected projects
+        clusters = allClusters.filter(cluster =>
+            selectedProjects.has(cluster.projectName)
+        );
+    }
+
+    renderClusters();
+    updateFilterIcon();
+}
+
+function updateFilterIcon() {
+    const icon = document.getElementById('projectFilterIcon');
+    if (selectedProjects.size < allProjectNames.length && selectedProjects.size > 0) {
+        icon.className = 'bi bi-funnel-fill text-primary';
+    } else {
+        icon.className = 'bi bi-funnel';
+    }
+}
+
+// Global functions for Select All / Clear All buttons
+window.selectAllProjects = function() {
+    selectedProjects = new Set(allProjectNames);
+    renderProjectFilterList(allProjectNames);
+    applyProjectFilter();
+};
+
+window.clearAllProjects = function() {
+    selectedProjects.clear();
+    renderProjectFilterList(allProjectNames);
+    applyProjectFilter();
+};
+
+// Helper function to render a single cluster row
+function renderClusterRow(cluster) {
+    const row = document.createElement('tr');
+    row.dataset.projectId = cluster.projectId;
+    row.dataset.clusterName = cluster.name;
+
+    const isDeleting = window.isClusterDeleting(cluster.projectId, cluster.name);
+    const isPaused = cluster.paused === true;
+    let displayStatus = isDeleting ? 'DELETING' : (cluster.stateName || 'UNKNOWN');
+    // Show PAUSED status if cluster is paused
+    if (isPaused && !isDeleting) {
+        displayStatus = 'PAUSED';
+    }
+    const statusClass = getStatusBadgeClass(displayStatus);
+    const users = cluster.users || [];
+    const pauseResumeBtn = getPauseResumeButton(cluster);
+
+    row.innerHTML = `
+        <td>
+            <a href="javascript:void(0)" class="cluster-name-link" onclick="showClusterDetails('${cluster.id || cluster.name}')">
+                <strong>${cluster.name}</strong>
+            </a>
+        </td>
+        <td>
+            <i class="bi bi-folder"></i> ${cluster.projectName || 'Unknown'}
+        </td>
+        <td><span class="badge ${statusClass}">${displayStatus}</span></td>
+        <td>
+            <a href="/clusters/${encodeURIComponent(cluster.name)}/databases" class="text-decoration-none">
+                ${cluster.clusterType || 'N/A'}
+            </a>
+        </td>
+        <td>${cluster.mongoDBVersion || 'N/A'}</td>
+        <td>${cluster.providerSettings?.providerName || 'N/A'}</td>
+        <td>${cluster.providerSettings?.regionName || 'N/A'}</td>
+        <td>${cluster.providerSettings?.instanceSizeName || 'N/A'}</td>
+        <td><span class="badge bg-secondary">${users.length}</span></td>
+        <td>
+            ${pauseResumeBtn}
+            <button class="btn btn-sm btn-outline-primary cluster-login-btn me-1"
+                    data-cluster="${cluster.name}"
+                    onclick="handleClusterAction('${cluster.name}')">
+                <i class="bi bi-box-arrow-in-right"></i> Login
+            </button>
+            <button class="btn btn-sm btn-outline-danger"
+                    onclick="showDeleteClusterConfirmation('${cluster.name}', '${cluster.projectId}', '${cluster.providerSettings?.providerName || ''}', '${cluster.providerSettings?.instanceSizeName || ''}')">
+                <i class="bi bi-trash"></i> Delete
+            </button>
+        </td>
+    `;
+    return row;
+}
+
+// Global function to remove a cluster row from the table
+window.removeClusterRow = function(projectId, clusterName) {
+    const container = document.getElementById('clustersContainer');
+    const row = container.querySelector(`tr[data-project-id="${projectId}"][data-cluster-name="${clusterName}"]`);
+    if (row) {
+        row.remove();
+        // Also remove from the clusters array
+        const index = clusters.findIndex(c => c.projectId === projectId && c.name === clusterName);
+        if (index !== -1) {
+            clusters.splice(index, 1);
+        }
+        // Update count
+        document.getElementById('clusterCount').textContent = clusters.length;
+        console.log(`Removed cluster row: ${clusterName} in project ${projectId}`);
+
+        // Show empty message if no clusters left
+        if (clusters.length === 0) {
+            container.innerHTML = '<tr><td colspan="10" class="text-center"><div class="alert alert-info mb-0">No clusters found</div></td></tr>';
+        }
+        return true;
+    }
+    return false;
+};
+
+// Global function to update a cluster row's status
+window.updateClusterRowStatus = function(projectId, clusterName, newStatus) {
+    const container = document.getElementById('clustersContainer');
+    const row = container.querySelector(`tr[data-project-id="${projectId}"][data-cluster-name="${clusterName}"]`);
+    if (row) {
+        const statusBadge = row.querySelector('td:nth-child(4) .badge');
+        if (statusBadge) {
+            statusBadge.className = `badge ${getStatusBadgeClass(newStatus)}`;
+            statusBadge.textContent = newStatus;
+        }
+        // Update in clusters array too
+        const cluster = clusters.find(c => c.projectId === projectId && c.name === clusterName);
+        if (cluster) {
+            cluster.stateName = newStatus;
+        }
+        console.log(`Updated cluster status: ${clusterName} -> ${newStatus}`);
+        return true;
+    }
+    return false;
+};
+
+// Global function to add or update a cluster in the table
+window.addOrUpdateClusterRow = function(cluster) {
+    const container = document.getElementById('clustersContainer');
+
+    // Check if row already exists
+    const existingRow = container.querySelector(`tr[data-project-id="${cluster.projectId}"][data-cluster-name="${cluster.name}"]`);
+
+    // Create new row
+    const newRow = renderClusterRow(cluster);
+
+    if (existingRow) {
+        // Update existing row
+        existingRow.replaceWith(newRow);
+        // Update in clusters array
+        const index = clusters.findIndex(c => c.projectId === cluster.projectId && c.name === cluster.name);
+        if (index !== -1) {
+            clusters[index] = cluster;
+        }
+        console.log(`Updated cluster row: ${cluster.name}`);
+    } else {
+        // Add new row at the beginning
+        // First check if we have the "no clusters" message
+        const noClusterMsg = container.querySelector('td[colspan="10"]');
+        if (noClusterMsg) {
+            container.innerHTML = '';
+        }
+        container.insertBefore(newRow, container.firstChild);
+        clusters.unshift(cluster);
+        console.log(`Added new cluster row: ${cluster.name}`);
+    }
+
+    // Update count
+    document.getElementById('clusterCount').textContent = clusters.length;
+};
+
+// Global function to get org/project names from existing clusters
+window.getClusterContext = function(projectId) {
+    const existingCluster = clusters.find(c => c.projectId === projectId);
+    if (existingCluster) {
+        return {
+            orgName: existingCluster.orgName || 'Unknown',
+            projectName: existingCluster.projectName || 'Unknown'
+        };
+    }
+    return { orgName: 'Unknown', projectName: 'Unknown' };
+};
+
+// ===== Pause/Resume Functionality =====
+
+// Track cooldown timers (key: "projectId:clusterName", value: cooldownEndsAt timestamp)
+const COOLDOWN_STORAGE_KEY = 'atlasui_pause_cooldowns';
+
+// Get cooldowns from localStorage
+function getCooldowns() {
+    try {
+        const stored = localStorage.getItem(COOLDOWN_STORAGE_KEY);
+        return stored ? JSON.parse(stored) : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+// Save cooldowns to localStorage
+function saveCooldowns(cooldowns) {
+    try {
+        localStorage.setItem(COOLDOWN_STORAGE_KEY, JSON.stringify(cooldowns));
+    } catch (e) {
+        console.error('Failed to save cooldowns:', e);
+    }
+}
+
+// Set cooldown for a cluster (60 minutes after resume)
+function setCooldown(projectId, clusterName, cooldownEndsAt) {
+    const key = `${projectId}:${clusterName}`;
+    const cooldowns = getCooldowns();
+    cooldowns[key] = cooldownEndsAt;
+    saveCooldowns(cooldowns);
+}
+
+// Get remaining cooldown time in seconds (0 if no cooldown or expired)
+function getRemainingCooldown(projectId, clusterName) {
+    const key = `${projectId}:${clusterName}`;
+    const cooldowns = getCooldowns();
+    const cooldownEndsAt = cooldowns[key];
+    if (!cooldownEndsAt) return 0;
+
+    const remaining = Math.ceil((cooldownEndsAt - Date.now() / 1000));
+    if (remaining <= 0) {
+        // Clean up expired cooldown
+        delete cooldowns[key];
+        saveCooldowns(cooldowns);
+        return 0;
+    }
+    return remaining;
+}
+
+// Check if a cluster can be paused (not M0/Free/Flex)
+function canBePaused(cluster) {
+    // Get instance size from providerSettings (old format) or replicationSpecs (new API format)
+    let instanceSize = cluster.providerSettings?.instanceSizeName || '';
+
+    // For M10+ clusters in new API format, instance size is in replicationSpecs
+    if (!instanceSize && cluster.replicationSpecs?.length > 0) {
+        const regionConfig = cluster.replicationSpecs[0]?.regionConfigs?.[0];
+        instanceSize = regionConfig?.electableSpecs?.instanceSize || '';
+    }
+
+    // M0 and Flex clusters cannot be paused
+    if (instanceSize === 'M0' || instanceSize === 'FLEX') {
+        return false;
+    }
+
+    // Check for TENANT provider (M0 uses TENANT)
+    const provider = cluster.providerSettings?.providerName || '';
+    if (provider === 'TENANT') {
+        return false;
+    }
+
+    // Also check regionConfigs for TENANT provider
+    if (cluster.replicationSpecs?.length > 0) {
+        const regionConfig = cluster.replicationSpecs[0]?.regionConfigs?.[0];
+        if (regionConfig?.providerName === 'TENANT') {
+            return false;
+        }
+    }
+
+    // Flex clusters have providerName = "FLEX"
+    if (provider === 'FLEX') {
+        return false;
+    }
+
+    // Only clusters with instance size (M10+) can be paused
+    // For dedicated clusters without providerSettings, they can be paused if clusterType is REPLICASET or SHARDED
+    if (instanceSize !== '' && instanceSize !== 'N/A') {
+        return true;
+    }
+
+    // Also allow pausing if this is a dedicated cluster (no TENANT provider, has replicationSpecs)
+    if (cluster.replicationSpecs?.length > 0 && cluster.clusterType) {
+        return true;
+    }
+
+    return false;
+}
+
+// Format seconds into MM:SS
+function formatCountdown(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Active countdown intervals (key: "projectId:clusterName")
+const countdownIntervals = {};
+
+// Start countdown timer for a cluster
+function startCountdown(projectId, clusterName) {
+    const key = `${projectId}:${clusterName}`;
+
+    // Clear existing interval if any
+    if (countdownIntervals[key]) {
+        clearInterval(countdownIntervals[key]);
+    }
+
+    const updateCountdown = () => {
+        const remaining = getRemainingCooldown(projectId, clusterName);
+        const btn = document.querySelector(`button[data-pause-cluster="${clusterName}"][data-pause-project="${projectId}"]`);
+
+        if (!btn) {
+            clearInterval(countdownIntervals[key]);
+            delete countdownIntervals[key];
+            return;
+        }
+
+        if (remaining <= 0) {
+            // Cooldown expired, show pause button
+            btn.outerHTML = `
+                <button class="btn btn-sm btn-outline-warning"
+                        data-pause-cluster="${clusterName}"
+                        data-pause-project="${projectId}"
+                        onclick="pauseCluster('${projectId}', '${clusterName}')">
+                    <i class="bi bi-pause-circle"></i> Pause
+                </button>`;
+            clearInterval(countdownIntervals[key]);
+            delete countdownIntervals[key];
+        } else {
+            // Update countdown display with label
+            btn.innerHTML = `<i class="bi bi-hourglass-split"></i> <span class="countdown-time">${formatCountdown(remaining)}</span><span class="countdown-label">Until next pause</span>`;
+        }
+    };
+
+    // Update immediately and then every second
+    updateCountdown();
+    countdownIntervals[key] = setInterval(updateCountdown, 1000);
+}
+
+// Generate pause/resume button HTML for a cluster
+function getPauseResumeButton(cluster) {
+    if (!canBePaused(cluster)) {
+        return ''; // No button for M0/Flex clusters
+    }
+
+    const projectId = cluster.projectId;
+    const clusterName = cluster.name;
+    const isPaused = cluster.paused === true;
+    const cooldownRemaining = getRemainingCooldown(projectId, clusterName);
+
+    if (isPaused) {
+        // Show resume button
+        return `
+            <button class="btn btn-sm btn-outline-success"
+                    data-pause-cluster="${clusterName}"
+                    data-pause-project="${projectId}"
+                    onclick="resumeCluster('${projectId}', '${clusterName}')">
+                <i class="bi bi-play-circle"></i> Resume
+            </button>`;
+    } else if (cooldownRemaining > 0) {
+        // Show countdown timer with label
+        return `
+            <button class="btn btn-sm btn-outline-secondary pause-countdown" disabled
+                    data-pause-cluster="${clusterName}"
+                    data-pause-project="${projectId}">
+                <i class="bi bi-hourglass-split"></i> <span class="countdown-time">${formatCountdown(cooldownRemaining)}</span><span class="countdown-label">Until next pause</span>
+            </button>`;
+    } else {
+        // Show pause button
+        return `
+            <button class="btn btn-sm btn-outline-warning"
+                    data-pause-cluster="${clusterName}"
+                    data-pause-project="${projectId}"
+                    onclick="pauseCluster('${projectId}', '${clusterName}')">
+                <i class="bi bi-pause-circle"></i> Pause
+            </button>`;
+    }
+}
+
+// Poll for cluster status until it matches expected state
+// Default: 120 attempts × 5 seconds = 10 minutes max
+async function pollClusterStatus(projectId, clusterName, expectedPaused, maxAttempts = 120, intervalMs = 5000) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            const response = await fetch(`/api/clusters/${projectId}/${clusterName}`);
+            if (response.ok) {
+                const data = await response.json();
+                const isPaused = data.paused === true;
+                const stateName = data.stateName || '';
+
+                console.log(`Poll ${attempt + 1}: paused=${isPaused}, stateName=${stateName}`);
+
+                if (expectedPaused && isPaused) {
+                    // Waiting for PAUSED state
+                    return { success: true, cluster: data };
+                } else if (!expectedPaused && !isPaused && stateName === 'IDLE') {
+                    // Waiting for IDLE state (after resume)
+                    return { success: true, cluster: data };
+                }
+            }
+        } catch (err) {
+            console.warn(`Poll attempt ${attempt + 1} failed:`, err);
+        }
+
+        // Wait before next attempt
+        await new Promise(resolve => setTimeout(resolve, intervalMs));
+    }
+
+    return { success: false, error: 'Timeout waiting for cluster status change' };
+}
+
+// Pause a cluster
+async function pauseCluster(projectId, clusterName) {
+    const btn = document.querySelector(`button[data-pause-cluster="${clusterName}"][data-pause-project="${projectId}"]`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Pausing...';
+    }
+
+    try {
+        const response = await fetch(`/api/clusters/${projectId}/${clusterName}/pause`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            console.log(`Pause request sent for cluster ${clusterName}, waiting for PAUSED state...`);
+
+            // Update status badge to show transition
+            window.updateClusterRowStatus(projectId, clusterName, 'PAUSING');
+
+            // Poll for PAUSED state
+            const pollResult = await pollClusterStatus(projectId, clusterName, true);
+
+            if (pollResult.success) {
+                console.log(`Cluster ${clusterName} is now PAUSED`);
+                // Update the button to show Resume
+                if (btn) {
+                    btn.outerHTML = `
+                        <button class="btn btn-sm btn-outline-success"
+                                data-pause-cluster="${clusterName}"
+                                data-pause-project="${projectId}"
+                                onclick="resumeCluster('${projectId}', '${clusterName}')">
+                            <i class="bi bi-play-circle"></i> Resume
+                        </button>`;
+                }
+                // Update cluster status badge
+                window.updateClusterRowStatus(projectId, clusterName, 'PAUSED');
+            } else {
+                console.warn('Timeout waiting for PAUSED state, but pause was initiated');
+                // Still update the button since the operation was accepted
+                if (btn) {
+                    btn.outerHTML = `
+                        <button class="btn btn-sm btn-outline-success"
+                                data-pause-cluster="${clusterName}"
+                                data-pause-project="${projectId}"
+                                onclick="resumeCluster('${projectId}', '${clusterName}')">
+                            <i class="bi bi-play-circle"></i> Resume
+                        </button>`;
+                }
+                window.updateClusterRowStatus(projectId, clusterName, 'PAUSED');
+            }
+        } else {
+            console.error('Failed to pause cluster:', data.detail);
+            alert(`Failed to pause cluster: ${data.detail || 'Unknown error'}`);
+            // Restore button
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-pause-circle"></i> Pause';
+            }
+        }
+    } catch (err) {
+        console.error('Error pausing cluster:', err);
+        alert(`Error pausing cluster: ${err.message}`);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-pause-circle"></i> Pause';
+        }
+    }
+}
+
+// Resume a cluster
+async function resumeCluster(projectId, clusterName) {
+    const btn = document.querySelector(`button[data-pause-cluster="${clusterName}"][data-pause-project="${projectId}"]`);
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Resuming...';
+    }
+
+    try {
+        const response = await fetch(`/api/clusters/${projectId}/${clusterName}/resume`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            console.log(`Resume request sent for cluster ${clusterName}, waiting for IDLE state...`);
+
+            // Update status badge to show transition
+            window.updateClusterRowStatus(projectId, clusterName, 'RESUMING');
+
+            // Poll for IDLE state (not paused and stateName === 'IDLE')
+            const pollResult = await pollClusterStatus(projectId, clusterName, false);
+
+            // Set cooldown timer (60 minutes) - start from when we initiated the resume
+            const cooldownEndsAt = data.cooldown_ends_at || (Date.now() / 1000 + 3600);
+            setCooldown(projectId, clusterName, cooldownEndsAt);
+
+            if (pollResult.success) {
+                console.log(`Cluster ${clusterName} is now IDLE`);
+                // Update the button to show countdown
+                if (btn) {
+                    const remaining = Math.ceil(cooldownEndsAt - Date.now() / 1000);
+                    btn.outerHTML = `
+                        <button class="btn btn-sm btn-outline-secondary pause-countdown" disabled
+                                data-pause-cluster="${clusterName}"
+                                data-pause-project="${projectId}">
+                            <i class="bi bi-hourglass-split"></i> <span class="countdown-time">${formatCountdown(remaining)}</span><span class="countdown-label">Until next pause</span>
+                        </button>`;
+                }
+                // Start countdown timer
+                startCountdown(projectId, clusterName);
+                // Update cluster status badge
+                window.updateClusterRowStatus(projectId, clusterName, 'IDLE');
+            } else {
+                console.warn('Timeout waiting for IDLE state, but resume was initiated');
+                // Still update the button since the operation was accepted
+                if (btn) {
+                    const remaining = Math.ceil(cooldownEndsAt - Date.now() / 1000);
+                    btn.outerHTML = `
+                        <button class="btn btn-sm btn-outline-secondary pause-countdown" disabled
+                                data-pause-cluster="${clusterName}"
+                                data-pause-project="${projectId}">
+                            <i class="bi bi-hourglass-split"></i> <span class="countdown-time">${formatCountdown(remaining)}</span><span class="countdown-label">Until next pause</span>
+                        </button>`;
+                }
+                startCountdown(projectId, clusterName);
+                window.updateClusterRowStatus(projectId, clusterName, 'IDLE');
+            }
+        } else {
+            console.error('Failed to resume cluster:', data.detail);
+            alert(`Failed to resume cluster: ${data.detail || 'Unknown error'}`);
+            // Restore button
+            if (btn) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-play-circle"></i> Resume';
+            }
+        }
+    } catch (err) {
+        console.error('Error resuming cluster:', err);
+        alert(`Error resuming cluster: ${err.message}`);
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-play-circle"></i> Resume';
+        }
+    }
+}
+
+// Initialize countdown timers for clusters with active cooldowns
+function initCountdownTimers() {
+    const cooldowns = getCooldowns();
+    const now = Date.now() / 1000;
+
+    Object.keys(cooldowns).forEach(key => {
+        const [projectId, clusterName] = key.split(':');
+        if (cooldowns[key] > now) {
+            // Start countdown for this cluster
+            startCountdown(projectId, clusterName);
+        }
+    });
+}
+
+// Global function to fetch a single cluster and add/update it in the table
+window.fetchAndUpdateCluster = async function(projectId, clusterName, isFlexCluster = false) {
+    try {
+        console.log(`Fetching cluster: ${clusterName} from project ${projectId}`);
+
+        // Fetch cluster details
+        let clusterData = null;
+        if (isFlexCluster) {
+            const response = await fetch(`/api/clusters/${projectId}/flex/list`);
+            if (response.ok) {
+                const data = await response.json();
+                clusterData = (data.results || []).find(c => c.name === clusterName);
+            }
+        } else {
+            const response = await fetch(`/api/clusters/${projectId}`);
+            if (response.ok) {
+                const data = await response.json();
+                clusterData = (data.results || []).find(c => c.name === clusterName);
+            }
+        }
+
+        if (!clusterData) {
+            console.warn(`Cluster ${clusterName} not found in API response`);
+            return false;
+        }
+
+        // We need to get the org and project names too
+        // Try to find them from existing clusters or fetch
+        let orgName = 'Unknown';
+        let projectName = 'Unknown';
+
+        // Check existing clusters for org/project names
+        const existingCluster = clusters.find(c => c.projectId === projectId);
+        if (existingCluster) {
+            orgName = existingCluster.orgName;
+            projectName = existingCluster.projectName;
+        } else {
+            // Need to fetch project info
+            try {
+                const orgsResponse = await fetch('/api/organizations/');
+                if (orgsResponse.ok) {
+                    const orgsData = await orgsResponse.json();
+                    for (const org of (orgsData.results || [])) {
+                        const projResponse = await fetch(`/api/organizations/${org.id}/projects`);
+                        if (projResponse.ok) {
+                            const projData = await projResponse.json();
+                            const project = (projData.results || []).find(p => p.id === projectId);
+                            if (project) {
+                                orgName = org.name;
+                                projectName = project.name;
+                                break;
+                            }
+                        }
+                    }
+                }
+            } catch (err) {
+                console.warn('Failed to fetch org/project names:', err);
+            }
+        }
+
+        // Build complete cluster object
+        const cluster = {
+            ...clusterData,
+            projectId: projectId,
+            orgName: orgName,
+            projectName: projectName,
+            users: [] // Users would need separate fetch
+        };
+
+        // Add or update the row
+        window.addOrUpdateClusterRow(cluster);
+        return true;
+
+    } catch (err) {
+        console.error(`Failed to fetch cluster ${clusterName}:`, err);
+        return false;
+    }
+};
+
 document.addEventListener('DOMContentLoaded', function() {
     loadClusters();
     document.getElementById('refreshBtn').addEventListener('click', loadClusters);
+
+    // Project search box within dropdown
+    const projectSearchBox = document.getElementById('projectSearchBox');
+    projectSearchBox.addEventListener('input', (e) => {
+        const searchText = e.target.value.toLowerCase();
+        if (searchText === '') {
+            renderProjectFilterList(allProjectNames);
+        } else {
+            const filteredProjects = allProjectNames.filter(name =>
+                name.toLowerCase().includes(searchText)
+            );
+            renderProjectFilterList(filteredProjects);
+        }
+    });
+
+    // Expose loadClusters to window for manual refresh (targeted updates are used for SSE events)
+    window.loadClusters = loadClusters;
 });
 
 async function loadClusters() {
@@ -565,13 +1388,21 @@ async function loadClusters() {
         });
 
         const clusterArrays = await Promise.all(clusterPromises);
-        clusters = clusterArrays.flat();
+        allClusters = clusterArrays.flat();
+        clusters = [...allClusters]; // Start with all clusters
         console.log(`[TIMING] All clusters fetched in ${(performance.now() - clusterStart).toFixed(0)}ms (${clusters.length} clusters)`);
         console.log(`[TIMING] TOTAL load time: ${(performance.now() - startTime).toFixed(0)}ms`);
 
         renderClusters();
         loading.classList.add('d-none');
         table.classList.remove('d-none');
+
+        // Build project filter dropdown
+        if (allClusters.length > 0) {
+            buildProjectFilterDropdown();
+            // Apply URL-based project filter if present
+            applyUrlProjectFilter();
+        }
 
     } catch (err) {
         console.error('Error loading clusters:', err);
@@ -592,11 +1423,20 @@ function renderClusters() {
 
     clusters.forEach(cluster => {
         const row = document.createElement('tr');
-        // Override status if cluster is being deleted
+        // Add data attributes for targeted updates
+        row.dataset.projectId = cluster.projectId;
+        row.dataset.clusterName = cluster.name;
+        // Override status if cluster is being deleted or paused
         const isDeleting = window.isClusterDeleting(cluster.projectId, cluster.name);
-        const displayStatus = isDeleting ? 'DELETING' : (cluster.stateName || 'UNKNOWN');
+        const isPaused = cluster.paused === true;
+        let displayStatus = isDeleting ? 'DELETING' : (cluster.stateName || 'UNKNOWN');
+        // Show PAUSED status if cluster is paused
+        if (isPaused && !isDeleting) {
+            displayStatus = 'PAUSED';
+        }
         const statusClass = getStatusBadgeClass(displayStatus);
         const users = cluster.users || [];
+        const pauseResumeBtn = getPauseResumeButton(cluster);
 
         row.innerHTML = `
             <td>
@@ -605,14 +1445,7 @@ function renderClusters() {
                 </a>
             </td>
             <td>
-                <a href="/organizations/${encodeURIComponent(cluster.orgName)}/projects" class="text-decoration-none">
-                    <i class="bi bi-building"></i> ${cluster.orgName}
-                </a>
-            </td>
-            <td>
-                <a href="/projects/${encodeURIComponent(cluster.projectName)}" class="text-decoration-none">
-                    <i class="bi bi-folder"></i> ${cluster.projectName}
-                </a>
+                <i class="bi bi-folder"></i> ${cluster.projectName}
             </td>
             <td><span class="badge ${statusClass}">${displayStatus}</span></td>
             <td>
@@ -626,6 +1459,7 @@ function renderClusters() {
             <td>${cluster.providerSettings?.instanceSizeName || 'N/A'}</td>
             <td><span class="badge bg-secondary">${users.length}</span></td>
             <td>
+                ${pauseResumeBtn}
                 <button class="btn btn-sm btn-outline-primary cluster-login-btn me-1"
                         data-cluster="${cluster.name}"
                         onclick="handleClusterAction('${cluster.name}')">
@@ -639,6 +1473,9 @@ function renderClusters() {
         `;
         container.appendChild(row);
     });
+
+    // Initialize countdown timers for any clusters with active cooldowns
+    initCountdownTimers();
 }
 
 function formatConnectionString(connectionString) {
@@ -659,12 +1496,15 @@ function getStatusBadgeClass(status) {
             return 'bg-success';
         case 'CREATING':
         case 'UPDATING':
+        case 'REPAIRING':
+        case 'PAUSING':
+        case 'RESUMING':
             return 'bg-warning';
+        case 'PAUSED':
+            return 'bg-info';
         case 'DELETING':
         case 'DELETED':
             return 'bg-danger';
-        case 'REPAIRING':
-            return 'bg-info';
         default:
             return 'bg-secondary';
     }
@@ -1550,6 +2390,34 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('createClusterForm').style.display = 'block';
         document.getElementById('createClusterError').classList.add('d-none');
         document.getElementById('regionName').disabled = true;
+    });
+
+    // Load preferences when create cluster modal is shown
+    createClusterModal.addEventListener('show.bs.modal', async function () {
+        try {
+            const response = await fetch('/api/setup/info');
+            const data = await response.json();
+
+            const providerSelect = document.getElementById('providerName');
+            const regionSelect = document.getElementById('regionName');
+
+            // Set preferred provider if available
+            if (data.preferred_cloud_provider) {
+                providerSelect.value = data.preferred_cloud_provider;
+
+                // Trigger change event to populate regions
+                providerSelect.dispatchEvent(new Event('change'));
+
+                // Wait a moment for regions to populate, then set preferred region
+                if (data.preferred_region) {
+                    setTimeout(() => {
+                        regionSelect.value = data.preferred_region;
+                    }, 100);
+                }
+            }
+        } catch (err) {
+            console.log('Could not load preferences:', err);
+        }
     });
 
     const deleteClusterModal = document.getElementById('deleteClusterModal');

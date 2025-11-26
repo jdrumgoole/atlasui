@@ -21,3 +21,7 @@ When making a release, follow this exact order:
 7. Build Sphinx documentation locally (cd docs && uv run sphinx-build -b html . _build/html)
 8. Push to GitHub (git push && git push --tags)
 9. Create GitHub Release with gh release create (this triggers the PyPI publish workflow)
+- make sure when we bump the release number that we always make a github release as this ensures that the pypi package gets built
+- when starting the atlasui server always specify --port 8100
+- fix all test failures in general before making a  release
+- when building tests and the UI, always poll for state changes rather than using timeouts. Where an appropriate state change is not available look to create that in the backend.
