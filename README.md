@@ -1,6 +1,10 @@
 # AtlasUI - MongoDB Atlas User Interface
 
+[![Documentation Status](https://readthedocs.org/projects/atlasui/badge/?version=latest)](https://atlasui.readthedocs.io/en/latest/?badge=latest)
+
 A comprehensive user interface for MongoDB Atlas, providing both a web-based UI and CLI tool for managing MongoDB Atlas resources.
+
+**📚 [Full Documentation on Read the Docs](https://atlasui.readthedocs.io/)**
 
 ## Features
 
@@ -330,6 +334,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](https://github.com/jdrum
 
 ## Quick Links
 
+- [Full Documentation](https://atlasui.readthedocs.io/) - Complete documentation on Read the Docs
 - [Quick Start Guide](https://github.com/jdrumgoole/atlasui/blob/main/QUICKSTART.md) - Get started in 5 minutes
 - [Contributing Guide](https://github.com/jdrumgoole/atlasui/blob/main/CONTRIBUTING.md) - Development guidelines
 - [MongoDB Atlas API Docs](https://www.mongodb.com/docs/atlas/reference/api-resources-spec/)
