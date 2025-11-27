@@ -49,6 +49,71 @@ def test(c, verbose=True, coverage=True):
 
 
 @task
+def test_all(c, verbose=True, coverage=True):
+    """
+    Run all tests in proper order (async tests, then browser tests separately).
+
+    This prevents event loop conflicts between async and browser tests by running
+    them in separate pytest sessions.
+
+    Args:
+        verbose: Run tests in verbose mode (default: True)
+        coverage: Generate coverage report (default: True)
+    """
+    print("=" * 80)
+    print("Running Complete Test Suite")
+    print("=" * 80)
+
+    # Run async tests (unit + integration, excluding browser)
+    print("\n[1/2] Running async tests (unit + integration)...")
+    print("-" * 80)
+    async_cmd = ["uv", "run", "pytest", "tests/", "-m", '"not browser"']
+
+    if verbose:
+        async_cmd.append("-v")
+
+    if coverage:
+        async_cmd.extend([
+            "--cov=atlasui",
+            "--cov-report=html",
+            "--cov-report=term"
+        ])
+
+    result = c.run(" ".join(async_cmd), warn=True)
+    async_passed = result.ok
+
+    # Run browser tests separately
+    print("\n[2/2] Running browser tests...")
+    print("-" * 80)
+    browser_cmd = ["uv", "run", "pytest", "tests/", "-m", "browser"]
+
+    if verbose:
+        browser_cmd.append("-v")
+
+    # Note: Coverage for browser tests is typically not meaningful
+    # as they test UI interactions, not code coverage
+
+    result = c.run(" ".join(browser_cmd), warn=True)
+    browser_passed = result.ok
+
+    # Summary
+    print("\n" + "=" * 80)
+    print("Test Suite Summary")
+    print("=" * 80)
+    print(f"Async tests:   {'✓ PASSED' if async_passed else '✗ FAILED'}")
+    print(f"Browser tests: {'✓ PASSED' if browser_passed else '✗ FAILED'}")
+    print("=" * 80)
+
+    if not (async_passed and browser_passed):
+        print("\n⚠ Some tests failed!")
+        raise SystemExit(1)
+    else:
+        print("\n✓ All tests passed!")
+        if coverage:
+            print(f"\nCoverage report: file://{Path('htmlcov/index.html').absolute()}")
+
+
+@task
 def lint(c):
     """Run linting checks."""
     print("Running linting checks...")
