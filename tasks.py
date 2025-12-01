@@ -232,16 +232,18 @@ def test_release(c, verbose=True, coverage=True, parallel=True):
     print("=" * 80)
     print("Running COMPLETE Test Suite for Release")
     if parallel:
-        print("(Async, Browser, and M10 tests in PARALLEL)")
+        print("(Async and Browser tests in PARALLEL)")
     print("=" * 80)
     print("⚠️  This includes M10 tests (~9 min cluster creation)")
     print("")
 
     if parallel:
-        # Run all three test suites in parallel
+        # Run async and browser tests in parallel
+        # NOTE: Browser tests (M0/Flex/M10) run in single session to avoid race conditions
+        # with session-scoped fixtures
         import subprocess
 
-        print("\n[1/3] Starting async tests in background...")
+        print("\n[1/2] Starting async tests in background...")
         print("-" * 80)
         async_cmd = ["uv", "run", "pytest", "tests/", "-m", "not browser"]
         if verbose:
@@ -260,9 +262,10 @@ def test_release(c, verbose=True, coverage=True, parallel=True):
             text=True
         )
 
-        print("\n[2/3] Starting browser tests (M0/Flex) in background...")
+        print("\n[2/2] Starting browser tests (M0/Flex/M10) in background...")
         print("-" * 80)
-        browser_cmd = ["uv", "run", "pytest", "tests/", "-m", "browser and not m10"]
+        print("⚠️  Browser tests run sequentially to share session-scoped cluster fixtures")
+        browser_cmd = ["uv", "run", "pytest", "tests/", "-m", "browser"]
         if verbose:
             browser_cmd.append("-v")
 
@@ -273,28 +276,13 @@ def test_release(c, verbose=True, coverage=True, parallel=True):
             text=True
         )
 
-        print("\n[3/3] Starting M10 tests in background...")
-        print("-" * 80)
-        m10_cmd = ["uv", "run", "pytest", "tests/", "-m", "browser and m10"]
-        if verbose:
-            m10_cmd.append("-v")
-
-        m10_proc = subprocess.Popen(
-            m10_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True
-        )
-
-        # Wait for all to complete
-        print("\nWaiting for all test suites to complete...")
+        # Wait for both to complete
+        print("\nWaiting for both test suites to complete...")
         async_output, _ = async_proc.communicate()
         browser_output, _ = browser_proc.communicate()
-        m10_output, _ = m10_proc.communicate()
 
         async_passed = async_proc.returncode == 0
         browser_passed = browser_proc.returncode == 0
-        m10_passed = m10_proc.returncode == 0
 
         # Print outputs
         print("\n" + "=" * 80)
@@ -303,18 +291,13 @@ def test_release(c, verbose=True, coverage=True, parallel=True):
         print(async_output)
 
         print("\n" + "=" * 80)
-        print("BROWSER TEST OUTPUT (M0/Flex)")
+        print("BROWSER TEST OUTPUT (M0/Flex/M10)")
         print("=" * 80)
         print(browser_output)
 
-        print("\n" + "=" * 80)
-        print("M10 TEST OUTPUT")
-        print("=" * 80)
-        print(m10_output)
-
     else:
         # Run sequentially
-        print("\n[1/3] Running async tests (unit + integration)...")
+        print("\n[1/2] Running async tests (unit + integration)...")
         print("-" * 80)
         async_cmd = ["uv", "run", "pytest", "tests/", "-m", '"not browser"']
 
@@ -331,10 +314,10 @@ def test_release(c, verbose=True, coverage=True, parallel=True):
         result = c.run(" ".join(async_cmd), warn=True)
         async_passed = result.ok
 
-        # Run browser tests (excluding M10)
-        print("\n[2/3] Running browser tests (M0/Flex)...")
+        # Run ALL browser tests (M0/Flex/M10) in single session
+        print("\n[2/2] Running browser tests (M0/Flex/M10)...")
         print("-" * 80)
-        browser_cmd = ["uv", "run", "pytest", "tests/", "-m", '"browser and not m10"']
+        browser_cmd = ["uv", "run", "pytest", "tests/", "-m", '"browser"']
 
         if verbose:
             browser_cmd.append("-v")
@@ -342,27 +325,15 @@ def test_release(c, verbose=True, coverage=True, parallel=True):
         result = c.run(" ".join(browser_cmd), warn=True)
         browser_passed = result.ok
 
-        # Run M10 tests
-        print("\n[3/3] Running M10 tests...")
-        print("-" * 80)
-        m10_cmd = ["uv", "run", "pytest", "tests/", "-m", '"browser and m10"']
-
-        if verbose:
-            m10_cmd.append("-v")
-
-        result = c.run(" ".join(m10_cmd), warn=True)
-        m10_passed = result.ok
-
     # Summary
     print("\n" + "=" * 80)
     print("Complete Test Suite Summary")
     print("=" * 80)
-    print(f"Async tests:           {'✓ PASSED' if async_passed else '✗ FAILED'}")
-    print(f"Browser tests (M0/Flex): {'✓ PASSED' if browser_passed else '✗ FAILED'}")
-    print(f"M10 tests:             {'✓ PASSED' if m10_passed else '✗ FAILED'}")
+    print(f"Async tests:              {'✓ PASSED' if async_passed else '✗ FAILED'}")
+    print(f"Browser tests (M0/Flex/M10): {'✓ PASSED' if browser_passed else '✗ FAILED'}")
     print("=" * 80)
 
-    if not (async_passed and browser_passed and m10_passed):
+    if not (async_passed and browser_passed):
         print("\n⚠ Some tests failed!")
         raise SystemExit(1)
     else:

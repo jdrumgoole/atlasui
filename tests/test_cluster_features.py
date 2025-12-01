@@ -429,7 +429,8 @@ def test_cluster_status_badges(page: Page, atlasui_server, test_clusters):
 
         cluster_row = page.locator(f'tr[data-cluster-name="{cluster_name}"]').first
         if cluster_row.count() > 0:
-            status_badge = cluster_row.locator("td:nth-child(4) .badge").first
+            # Status column is td:nth-child(3): Name | Project | Status | Type | ...
+            status_badge = cluster_row.locator("td:nth-child(3) .badge").first
             status_text = status_badge.text_content() if status_badge.count() > 0 else "UNKNOWN"
             log(f"   {cluster_type.upper()} cluster '{cluster_name}' - status: {status_text}")
 
