@@ -227,3 +227,120 @@ async def delete_project(
 
         # Generic error
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{project_id}/access-list")
+async def get_project_access_list(project_id: str) -> Dict[str, Any]:
+    """
+    Get IP access list (whitelist) for a specific project.
+
+    Args:
+        project_id: MongoDB Atlas project ID
+
+    Returns:
+        IP access list entries
+    """
+    try:
+        async with AtlasClient() as client:
+            return await client.get(f"/groups/{project_id}/accessList")
+    except Exception as e:
+        if "404" in str(e):
+            # No access list entries or project not found - return empty results
+            return {"results": [], "totalCount": 0}
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{project_id}/access-list")
+async def add_ip_to_access_list(
+    project_id: str,
+    ip_address: str = Body(None, embed=True),
+    cidr_block: str = Body(None, embed=True),
+    comment: str = Body(None, embed=True)
+) -> Dict[str, Any]:
+    """
+    Add an IP address or CIDR block to the project's access list.
+
+    Args:
+        project_id: MongoDB Atlas project ID
+        ip_address: Single IP address (e.g., "192.168.1.1")
+        cidr_block: CIDR block (e.g., "192.168.1.0/24")
+        comment: Optional comment for the entry
+
+    Returns:
+        Created access list entry
+    """
+    if not ip_address and not cidr_block:
+        raise HTTPException(
+            status_code=400,
+            detail="Either ip_address or cidr_block must be provided"
+        )
+
+    try:
+        async with AtlasClient() as client:
+            # Build the entry - Atlas API accepts an array of entries
+            entry: Dict[str, Any] = {}
+            if ip_address:
+                entry["ipAddress"] = ip_address
+            elif cidr_block:
+                entry["cidrBlock"] = cidr_block
+
+            if comment:
+                entry["comment"] = comment
+
+            # Atlas API expects an array of entries
+            result = await client.post(
+                f"/groups/{project_id}/accessList",
+                json=[entry]
+            )
+            return {
+                "success": True,
+                "message": "IP address added to access list",
+                "results": result.get("results", [result])
+            }
+    except Exception as e:
+        error_str = str(e)
+        if "DUPLICATE" in error_str or "already exists" in error_str.lower():
+            raise HTTPException(
+                status_code=409,
+                detail="This IP address or CIDR block already exists in the access list"
+            )
+        if "INVALID" in error_str:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid IP address or CIDR block format"
+            )
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{project_id}/access-list/{entry_value}")
+async def delete_ip_from_access_list(
+    project_id: str,
+    entry_value: str
+) -> Dict[str, Any]:
+    """
+    Remove an IP address or CIDR block from the project's access list.
+
+    Args:
+        project_id: MongoDB Atlas project ID
+        entry_value: IP address or CIDR block to remove (URL-encoded if contains /)
+
+    Returns:
+        Deletion confirmation
+    """
+    try:
+        async with AtlasClient() as client:
+            # The entry_value should be URL-encoded for CIDR blocks
+            # FastAPI handles URL decoding automatically
+            await client.delete(f"/groups/{project_id}/accessList/{entry_value}")
+            return {
+                "success": True,
+                "message": f"IP address {entry_value} removed from access list"
+            }
+    except Exception as e:
+        error_str = str(e)
+        if "404" in error_str:
+            raise HTTPException(
+                status_code=404,
+                detail=f"IP address {entry_value} not found in access list"
+            )
+        raise HTTPException(status_code=500, detail=str(e))

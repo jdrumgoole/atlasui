@@ -279,6 +279,70 @@ Alternatively, from the Projects page:
 2. Click the blue cluster count badge
 3. View filtered clusters for that project only
 
+## IP Access List Management
+
+AtlasUI provides a convenient interface for managing IP access lists (whitelists) for your MongoDB Atlas projects directly from the Projects page.
+
+### Overview
+
+MongoDB Atlas requires IP addresses to be whitelisted before they can connect to clusters. The IP Access List Management feature allows you to:
+
+* View all IP addresses and CIDR blocks currently allowed for a project
+* Add new IP addresses or CIDR blocks to the access list
+* Remove IP addresses from the access list
+* Add optional comments to identify the purpose of each entry
+
+### How to Use
+
+1. Navigate to the Projects page
+2. Find the project you want to manage
+3. Click the **Manage IP** button (blue shield icon) in the Actions column
+4. A modal dialog opens showing the IP management interface
+
+### Adding IP Addresses
+
+In the "Add IP Address" section:
+
+1. Enter an IP address (e.g., `192.168.1.1`) or CIDR block (e.g., `10.0.0.0/24`)
+2. Optionally add a comment to describe the entry (e.g., "Office network")
+3. Click **Add** to add the entry to the access list
+
+**Note**: Use `0.0.0.0/0` to allow access from anywhere (not recommended for production).
+
+### Removing IP Addresses
+
+In the "Current Access List" section:
+
+1. Find the IP address you want to remove
+2. Click the red trash icon in the Actions column
+3. Confirm the deletion when prompted
+
+### API Endpoints
+
+The following REST API endpoints are available:
+
+* `GET /api/projects/{project_id}/access-list` - Get all IP access list entries
+* `POST /api/projects/{project_id}/access-list` - Add a new IP address or CIDR block
+* `DELETE /api/projects/{project_id}/access-list/{entry}` - Remove an IP address
+
+### Request Format (POST)
+
+```json
+{
+    "ip_address": "192.168.1.1",
+    "comment": "Office IP"
+}
+```
+
+Or for CIDR blocks:
+
+```json
+{
+    "cidr_block": "10.0.0.0/24",
+    "comment": "VPN network"
+}
+```
+
 ## Responsive UI
 
 The interface is built with Bootstrap 5 and provides:

@@ -156,6 +156,96 @@
         </div>
     </div>
 </div>
+
+<!-- IP Access List Management Modal -->
+<div class="modal fade" id="ipManagementModal" tabindex="-1" aria-labelledby="ipManagementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ipManagementModalLabel">
+                    <i class="bi bi-shield-lock"></i> IP Access List - <span id="ipProjectName"></span>
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Add IP Form -->
+                <div class="card mb-3">
+                    <div class="card-header bg-light">
+                        <i class="bi bi-plus-circle"></i> Add IP Address
+                    </div>
+                    <div class="card-body">
+                        <form id="addIPForm" onsubmit="return false;">
+                            <div class="row g-2">
+                                <div class="col-md-5">
+                                    <label for="ipAddressInput" class="form-label">IP Address or CIDR Block</label>
+                                    <input type="text" class="form-control" id="ipAddressInput"
+                                           placeholder="e.g., 192.168.1.1 or 10.0.0.0/24" required>
+                                    <div class="form-text">Use 0.0.0.0/0 to allow access from anywhere</div>
+                                </div>
+                                <div class="col-md-5">
+                                    <label for="ipCommentInput" class="form-label">Comment (optional)</label>
+                                    <input type="text" class="form-control" id="ipCommentInput"
+                                           placeholder="e.g., Office network" maxlength="80">
+                                    <div class="form-text">&nbsp;</div>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label">&nbsp;</label>
+                                    <button type="submit" class="btn btn-success w-100" id="addIPBtn" onclick="addIPAddress()">
+                                        <i class="bi bi-plus"></i> Add
+                                    </button>
+                                    <div class="form-text">&nbsp;</div>
+                                </div>
+                            </div>
+                            <div id="addIPError" class="alert alert-danger mt-2 d-none" role="alert"></div>
+                            <div id="addIPSuccess" class="alert alert-success mt-2 d-none" role="alert"></div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Current IP Access List -->
+                <div class="card">
+                    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-list-ul"></i> Current Access List</span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="refreshIPList()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="ipListLoading" class="text-center my-3">
+                            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <span class="ms-2">Loading IP access list...</span>
+                        </div>
+                        <div id="ipListContent" class="d-none">
+                            <div id="ipListEmpty" class="alert alert-info d-none">
+                                <i class="bi bi-info-circle"></i> No IP addresses in the access list. Add one above to enable connections.
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover" id="ipListTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>IP/CIDR</th>
+                                            <th>Comment</th>
+                                            <th>Added</th>
+                                            <th width="80">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ipListBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div id="ipListError" class="alert alert-danger d-none" role="alert"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -325,6 +415,9 @@ function renderProjects() {
             </td>
             <td>${new Date(project.created).toLocaleString()}</td>
             <td>
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="openIPManagement('${project.id}', '${project.name.replace(/'/g, "\\'")}')">
+                    <i class="bi bi-shield-lock"></i> Manage IP
+                </button>
                 <button class="btn btn-sm btn-outline-danger" onclick="confirmDeleteProject('${project.id}', '${project.name.replace(/'/g, "\\'")}')">
                     <i class="bi bi-trash"></i> Delete
                 </button>
@@ -360,17 +453,19 @@ async function showProjectDetails(projectId) {
 
     try {
         // Fetch all related data in parallel
-        const [clustersData, usersData, alertsData, projectDetailsData] = await Promise.all([
+        const [clustersData, usersData, alertsData, projectDetailsData, accessListData] = await Promise.all([
             fetch(`/api/clusters/${project.id}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
             fetch(`/api/users/${project.id}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
             fetch(`/api/alerts/${project.id}`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] })),
-            fetch(`/api/projects/${project.id}`).then(r => r.ok ? r.json() : {}).catch(() => ({}))
+            fetch(`/api/projects/${project.id}`).then(r => r.ok ? r.json() : {}).catch(() => ({})),
+            fetch(`/api/projects/${project.id}/access-list`).then(r => r.ok ? r.json() : { results: [] }).catch(() => ({ results: [] }))
         ]);
 
         const clusters = clustersData.results || [];
         const users = usersData.results || [];
         const alerts = alertsData.results || [];
         const projectDetails = projectDetailsData;
+        const accessList = accessListData.results || [];
 
         // Build comprehensive details HTML
         let html = `
@@ -387,6 +482,7 @@ async function showProjectDetails(projectId) {
                         <tr><th>Organization ID</th><td><code class="small">${project.orgId}</code></td></tr>
                         <tr><th>Cluster Count</th><td>${project.clusterCount || 0}</td></tr>
                         <tr><th>Database Users</th><td>${users.length}</td></tr>
+                        <tr><th>IP Access List</th><td>${accessList.length} ${accessList.length === 1 ? 'entry' : 'entries'}</td></tr>
                         <tr><th>Active Alerts</th><td><span class="badge ${alerts.length > 0 ? 'bg-warning' : 'bg-success'}">${alerts.length}</span></td></tr>
                         <tr><th>Created</th><td>${new Date(project.created).toLocaleString()}</td></tr>
                     </tbody>
@@ -502,6 +598,44 @@ async function showProjectDetails(projectId) {
                 <div class="mb-3">
                     <h6 class="text-muted">Database Users</h6>
                     <p class="small text-muted">No database users in this project</p>
+                </div>
+            `;
+        }
+
+        // Add IP access list section
+        if (accessList.length > 0) {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">IP Access List (${accessList.length})</h6>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>IP/CIDR</th>
+                                    <th>Comment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${accessList.map(entry => {
+                                    const ipAddress = entry.ipAddress || entry.cidrBlock || 'N/A';
+                                    const comment = entry.comment || '<span class="text-muted">No comment</span>';
+                                    return `
+                                        <tr>
+                                            <td><code class="small">${ipAddress}</code></td>
+                                            <td>${comment}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } else {
+            html += `
+                <div class="mb-3">
+                    <h6 class="text-muted">IP Access List</h6>
+                    <p class="small text-muted">No IP access list entries configured for this project</p>
                 </div>
             `;
         }
@@ -1248,6 +1382,219 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('createProjectError').classList.add('d-none');
         document.getElementById('createProjectBtn').disabled = false;
         document.getElementById('createProjectBtn').innerHTML = '<i class="bi bi-plus-circle"></i> Create Project';
+    });
+});
+
+// IP Access List Management
+let currentIPProjectId = null;
+let currentIPProjectName = null;
+
+function openIPManagement(projectId, projectName) {
+    currentIPProjectId = projectId;
+    currentIPProjectName = projectName;
+
+    // Update modal title
+    document.getElementById('ipProjectName').textContent = projectName;
+
+    // Reset form and messages
+    document.getElementById('ipAddressInput').value = '';
+    document.getElementById('ipCommentInput').value = '';
+    document.getElementById('addIPError').classList.add('d-none');
+    document.getElementById('addIPSuccess').classList.add('d-none');
+
+    // Show modal
+    const modal = new bootstrap.Modal(document.getElementById('ipManagementModal'));
+    modal.show();
+
+    // Load IP list
+    loadIPList();
+}
+
+async function loadIPList() {
+    const loading = document.getElementById('ipListLoading');
+    const content = document.getElementById('ipListContent');
+    const error = document.getElementById('ipListError');
+    const empty = document.getElementById('ipListEmpty');
+    const table = document.getElementById('ipListTable');
+    const tbody = document.getElementById('ipListBody');
+
+    // Show loading state
+    loading.classList.remove('d-none');
+    content.classList.add('d-none');
+    error.classList.add('d-none');
+
+    try {
+        const response = await fetch(`/api/projects/${currentIPProjectId}/access-list`);
+        if (!response.ok) throw new Error('Failed to fetch IP access list');
+
+        const data = await response.json();
+        const accessList = data.results || [];
+
+        // Clear current list
+        tbody.innerHTML = '';
+
+        if (accessList.length === 0) {
+            empty.classList.remove('d-none');
+            table.classList.add('d-none');
+        } else {
+            empty.classList.add('d-none');
+            table.classList.remove('d-none');
+
+            accessList.forEach(entry => {
+                const ipAddress = entry.ipAddress || entry.cidrBlock || 'N/A';
+                const comment = entry.comment || '';
+                const created = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : 'N/A';
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td><code>${escapeHtml(ipAddress)}</code></td>
+                    <td>${escapeHtml(comment) || '<span class="text-muted">-</span>'}</td>
+                    <td class="small">${created}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteIPAddress('${escapeHtml(ipAddress)}')" title="Remove IP">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        loading.classList.add('d-none');
+        content.classList.remove('d-none');
+
+    } catch (err) {
+        console.error('Error loading IP list:', err);
+        loading.classList.add('d-none');
+        error.textContent = `Failed to load IP access list: ${err.message}`;
+        error.classList.remove('d-none');
+    }
+}
+
+function refreshIPList() {
+    loadIPList();
+}
+
+async function addIPAddress() {
+    const ipInput = document.getElementById('ipAddressInput');
+    const commentInput = document.getElementById('ipCommentInput');
+    const errorDiv = document.getElementById('addIPError');
+    const successDiv = document.getElementById('addIPSuccess');
+    const btn = document.getElementById('addIPBtn');
+
+    const ipValue = ipInput.value.trim();
+    const comment = commentInput.value.trim();
+
+    // Clear previous messages
+    errorDiv.classList.add('d-none');
+    successDiv.classList.add('d-none');
+
+    if (!ipValue) {
+        errorDiv.textContent = 'Please enter an IP address or CIDR block';
+        errorDiv.classList.remove('d-none');
+        return;
+    }
+
+    // Determine if it's a CIDR block or single IP
+    const isCIDR = ipValue.includes('/');
+
+    // Disable button and show loading
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+
+    try {
+        const body = { comment: comment || null };
+        if (isCIDR) {
+            body.cidr_block = ipValue;
+        } else {
+            body.ip_address = ipValue;
+        }
+
+        const response = await fetch(`/api/projects/${currentIPProjectId}/access-list`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.detail || 'Failed to add IP address');
+        }
+
+        // Success
+        successDiv.textContent = `IP address ${ipValue} added successfully`;
+        successDiv.classList.remove('d-none');
+
+        // Clear form
+        ipInput.value = '';
+        commentInput.value = '';
+
+        // Reload list
+        loadIPList();
+
+        // Auto-hide success message after 3 seconds
+        setTimeout(() => successDiv.classList.add('d-none'), 3000);
+
+    } catch (err) {
+        console.error('Error adding IP:', err);
+        errorDiv.textContent = err.message;
+        errorDiv.classList.remove('d-none');
+    } finally {
+        // Re-enable button
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-plus"></i> Add';
+    }
+}
+
+async function deleteIPAddress(ipAddress) {
+    if (!confirm(`Are you sure you want to remove ${ipAddress} from the access list?`)) {
+        return;
+    }
+
+    const errorDiv = document.getElementById('ipListError');
+    errorDiv.classList.add('d-none');
+
+    try {
+        // URL encode the IP address (important for CIDR blocks with /)
+        const encodedIP = encodeURIComponent(ipAddress);
+
+        const response = await fetch(`/api/projects/${currentIPProjectId}/access-list/${encodedIP}`, {
+            method: 'DELETE'
+        });
+
+        if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.detail || 'Failed to remove IP address');
+        }
+
+        // Reload list
+        loadIPList();
+
+    } catch (err) {
+        console.error('Error deleting IP:', err);
+        errorDiv.textContent = `Failed to remove IP address: ${err.message}`;
+        errorDiv.classList.remove('d-none');
+    }
+}
+
+// Helper function to escape HTML
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Reset IP management modal when closed
+document.addEventListener('DOMContentLoaded', function() {
+    const ipModal = document.getElementById('ipManagementModal');
+    ipModal.addEventListener('hidden.bs.modal', function() {
+        currentIPProjectId = null;
+        currentIPProjectName = null;
+        document.getElementById('ipAddressInput').value = '';
+        document.getElementById('ipCommentInput').value = '';
+        document.getElementById('addIPError').classList.add('d-none');
+        document.getElementById('addIPSuccess').classList.add('d-none');
     });
 });
 </script>
