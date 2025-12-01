@@ -692,10 +692,6 @@ function renderClusterRow(cluster) {
     const isDeleting = window.isClusterDeleting(cluster.projectId, cluster.name);
     const isPaused = cluster.paused === true;
     let displayStatus = isDeleting ? 'DELETING' : (cluster.stateName || 'UNKNOWN');
-    // Show PAUSED status if cluster is paused
-    if (isPaused && !isDeleting) {
-        displayStatus = 'PAUSED';
-    }
     const statusClass = getStatusBadgeClass(displayStatus);
     const users = cluster.users || [];
     const pauseResumeBtn = getPauseResumeButton(cluster);
@@ -709,7 +705,10 @@ function renderClusterRow(cluster) {
         <td>
             <i class="bi bi-folder"></i> ${cluster.projectName || 'Unknown'}
         </td>
-        <td><span class="badge ${statusClass}">${displayStatus}</span></td>
+        <td>
+            <span class="badge ${statusClass}">${displayStatus}</span>
+            ${isPaused && !isDeleting ? '<span class="badge bg-warning text-dark ms-1">PAUSED</span>' : ''}
+        </td>
         <td>
             <a href="/clusters/${encodeURIComponent(cluster.name)}/databases" class="text-decoration-none">
                 ${cluster.clusterType || 'N/A'}
@@ -1317,6 +1316,40 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Expose loadClusters to window for manual refresh (targeted updates are used for SSE events)
     window.loadClusters = loadClusters;
+
+    // Listen for operation completions to auto-refresh cluster list
+    let pollAttempts = 0;
+    const maxPollAttempts = 10;
+    const pollInterval = setInterval(() => {
+        pollAttempts++;
+        console.log(`[All Clusters] Polling for operationQueueUI (attempt ${pollAttempts}/${maxPollAttempts})`);
+
+        if (window.operationQueueUI && window.operationQueueUI.manager) {
+            clearInterval(pollInterval);
+            console.log('[All Clusters] operationQueueUI found, registering listener');
+
+            window.operationQueueUI.manager.addListener((event, operation) => {
+                console.log('[All Clusters] SSE event received:', event, 'type:', operation.type);
+
+                // Reload clusters list when:
+                // - create_cluster completes (new cluster added)
+                // - delete_cluster completes (cluster removed - including cascading deletes from project deletion)
+                if (event === 'completed' &&
+                    (operation.type === 'create_cluster' ||
+                     operation.type === 'delete_cluster' ||
+                     operation.type === 'create_flex_cluster' ||
+                     operation.type === 'delete_flex_cluster')) {
+                    console.log(`[All Clusters] ${operation.type} completed, reloading clusters list`);
+                    loadClusters();
+                }
+            });
+
+            console.log('[All Clusters] Event listener registered successfully');
+        } else if (pollAttempts >= maxPollAttempts) {
+            clearInterval(pollInterval);
+            console.error('[All Clusters] Failed to find operationQueueUI after', maxPollAttempts, 'attempts');
+        }
+    }, 500);
 });
 
 async function loadClusters() {
@@ -1434,10 +1467,6 @@ function renderClusters() {
         const isDeleting = window.isClusterDeleting(cluster.projectId, cluster.name);
         const isPaused = cluster.paused === true;
         let displayStatus = isDeleting ? 'DELETING' : (cluster.stateName || 'UNKNOWN');
-        // Show PAUSED status if cluster is paused
-        if (isPaused && !isDeleting) {
-            displayStatus = 'PAUSED';
-        }
         const statusClass = getStatusBadgeClass(displayStatus);
         const users = cluster.users || [];
         const pauseResumeBtn = getPauseResumeButton(cluster);
@@ -1451,7 +1480,10 @@ function renderClusters() {
             <td>
                 <i class="bi bi-folder"></i> ${cluster.projectName}
             </td>
-            <td><span class="badge ${statusClass}">${displayStatus}</span></td>
+            <td>
+                <span class="badge ${statusClass}">${displayStatus}</span>
+                ${isPaused && !isDeleting ? '<span class="badge bg-warning text-dark ms-1">PAUSED</span>' : ''}
+            </td>
             <td>
                 <a href="/clusters/${encodeURIComponent(cluster.name)}/databases" class="text-decoration-none">
                     ${cluster.clusterType || 'N/A'}

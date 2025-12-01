@@ -6,6 +6,8 @@ A comprehensive user interface for MongoDB Atlas, providing both a web-based UI 
 
 **📚 [Full Documentation on Read the Docs](https://atlasui.readthedocs.io/)**
 
+**🖼️ [View Screenshots on GitHub](https://github.com/jdrumgoole/atlasui#screenshots)**
+
 ## Features
 
 - **Web UI**: FastAPI-based web interface for MongoDB Atlas management
@@ -13,20 +15,6 @@ A comprehensive user interface for MongoDB Atlas, providing both a web-based UI 
 - **Complete API Coverage**: Built from official MongoDB Atlas OpenAPI specifications
 - **Modern Stack**: FastAPI, Typer, Rich, and modern Python tooling
 - **Secure Authentication**: Supports both API keys (recommended for full functionality) and service accounts (project-scoped only)
-
-## Screenshots
-
-### Dashboard
-![Dashboard](https://raw.githubusercontent.com/jdrumgoole/atlasui/main/docs/images/dashboard.png)
-
-### Organizations
-![Organizations](https://raw.githubusercontent.com/jdrumgoole/atlasui/main/docs/images/organizations.png)
-
-### All Clusters
-![Clusters](https://raw.githubusercontent.com/jdrumgoole/atlasui/main/docs/images/clusters.png)
-
-### All Projects
-![Projects](https://raw.githubusercontent.com/jdrumgoole/atlasui/main/docs/images/projects.png)
 
 ## Atlas API Coverage
 
@@ -341,6 +329,7 @@ Contributions are welcome! Please see [CONTRIBUTING.md](https://github.com/jdrum
 ## Quick Links
 
 - [Full Documentation](https://atlasui.readthedocs.io/) - Complete documentation on Read the Docs
+- [Screenshots](https://github.com/jdrumgoole/atlasui#screenshots) - View application screenshots on GitHub
 - [Quick Start Guide](https://github.com/jdrumgoole/atlasui/blob/main/QUICKSTART.md) - Get started in 5 minutes
 - [Contributing Guide](https://github.com/jdrumgoole/atlasui/blob/main/CONTRIBUTING.md) - Development guidelines
 - [MongoDB Atlas API Docs](https://www.mongodb.com/docs/atlas/reference/api-resources-spec/)

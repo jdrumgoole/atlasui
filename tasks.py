@@ -49,66 +49,324 @@ def test(c, verbose=True, coverage=True):
 
 
 @task
-def test_all(c, verbose=True, coverage=True):
+def m10_test(c, verbose=True):
     """
-    Run all tests in proper order (async tests, then browser tests separately).
+    Run M10-specific tests only (includes pause/resume functionality).
 
-    This prevents event loop conflicts between async and browser tests by running
-    them in separate pytest sessions.
+    M10 cluster creation takes ~9 minutes, so these tests are isolated
+    for faster development iteration.
+
+    Args:
+        verbose: Run tests in verbose mode (default: True)
+    """
+    print("=" * 80)
+    print("Running M10 Test Suite")
+    print("=" * 80)
+    print("⚠️  M10 cluster creation takes ~9 minutes")
+    print("")
+
+    # Run M10 browser tests
+    print("\n[1/1] Running M10 browser tests...")
+    print("-" * 80)
+    m10_cmd = ["uv", "run", "pytest", "tests/", "-m", '"browser and m10"']
+
+    if verbose:
+        m10_cmd.append("-v")
+
+    result = c.run(" ".join(m10_cmd), warn=True)
+    m10_passed = result.ok
+
+    # Summary
+    print("\n" + "=" * 80)
+    print("M10 Test Suite Summary")
+    print("=" * 80)
+    print(f"M10 tests: {'✓ PASSED' if m10_passed else '✗ FAILED'}")
+    print("=" * 80)
+
+    if not m10_passed:
+        print("\n⚠ M10 tests failed!")
+        raise SystemExit(1)
+    else:
+        print("\n✓ M10 tests passed!")
+
+
+@task
+def test_dev(c, verbose=True, coverage=True, parallel=True):
+    """
+    Run development test suite (excludes slow M10 tests).
+
+    This is the fast test suite for development iteration. M10 tests are
+    excluded because M10 cluster creation takes ~9 minutes.
+
+    Use 'inv test-release' or 'inv m10-test' to run M10 tests.
 
     Args:
         verbose: Run tests in verbose mode (default: True)
         coverage: Generate coverage report (default: True)
+        parallel: Run async and browser tests in parallel (default: True, use --no-parallel to disable)
     """
     print("=" * 80)
-    print("Running Complete Test Suite")
+    print("Running Development Test Suite (excludes M10)")
+    if parallel:
+        print("(Async and Browser tests in PARALLEL)")
     print("=" * 80)
 
-    # Run async tests (unit + integration, excluding browser)
-    print("\n[1/2] Running async tests (unit + integration)...")
-    print("-" * 80)
-    async_cmd = ["uv", "run", "pytest", "tests/", "-m", '"not browser"']
+    if parallel:
+        # Run async and browser tests in parallel
+        import subprocess
 
-    if verbose:
-        async_cmd.append("-v")
+        print("\n[1/2] Starting async tests (unit + integration) in background...")
+        print("-" * 80)
+        async_cmd = ["uv", "run", "pytest", "tests/", "-m", "not browser"]
+        if verbose:
+            async_cmd.append("-v")
+        if coverage:
+            async_cmd.extend([
+                "--cov=atlasui",
+                "--cov-report=html",
+                "--cov-report=term"
+            ])
 
-    if coverage:
-        async_cmd.extend([
-            "--cov=atlasui",
-            "--cov-report=html",
-            "--cov-report=term"
-        ])
+        async_proc = subprocess.Popen(
+            async_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
 
-    result = c.run(" ".join(async_cmd), warn=True)
-    async_passed = result.ok
+        print("\n[2/2] Starting browser tests (excluding M10) in background...")
+        print("-" * 80)
+        browser_cmd = ["uv", "run", "pytest", "tests/", "-m", "browser and not m10"]
+        if verbose:
+            browser_cmd.append("-v")
 
-    # Run browser tests separately
-    print("\n[2/2] Running browser tests...")
-    print("-" * 80)
-    browser_cmd = ["uv", "run", "pytest", "tests/", "-m", "browser"]
+        browser_proc = subprocess.Popen(
+            browser_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
 
-    if verbose:
-        browser_cmd.append("-v")
+        # Wait for both to complete
+        print("\nWaiting for both test suites to complete...")
+        async_output, _ = async_proc.communicate()
+        browser_output, _ = browser_proc.communicate()
 
-    # Note: Coverage for browser tests is typically not meaningful
-    # as they test UI interactions, not code coverage
+        async_passed = async_proc.returncode == 0
+        browser_passed = browser_proc.returncode == 0
 
-    result = c.run(" ".join(browser_cmd), warn=True)
-    browser_passed = result.ok
+        # Print outputs
+        print("\n" + "=" * 80)
+        print("ASYNC TEST OUTPUT")
+        print("=" * 80)
+        print(async_output)
+
+        print("\n" + "=" * 80)
+        print("BROWSER TEST OUTPUT (M0/Flex)")
+        print("=" * 80)
+        print(browser_output)
+
+    else:
+        # Run sequentially (original behavior)
+        print("\n[1/2] Running async tests (unit + integration)...")
+        print("-" * 80)
+        async_cmd = ["uv", "run", "pytest", "tests/", "-m", '"not browser"']
+
+        if verbose:
+            async_cmd.append("-v")
+
+        if coverage:
+            async_cmd.extend([
+                "--cov=atlasui",
+                "--cov-report=html",
+                "--cov-report=term"
+            ])
+
+        result = c.run(" ".join(async_cmd), warn=True)
+        async_passed = result.ok
+
+        # Run browser tests (excluding M10)
+        print("\n[2/2] Running browser tests (excluding M10)...")
+        print("-" * 80)
+        browser_cmd = ["uv", "run", "pytest", "tests/", "-m", '"browser and not m10"']
+
+        if verbose:
+            browser_cmd.append("-v")
+
+        result = c.run(" ".join(browser_cmd), warn=True)
+        browser_passed = result.ok
 
     # Summary
     print("\n" + "=" * 80)
-    print("Test Suite Summary")
+    print("Development Test Suite Summary")
     print("=" * 80)
-    print(f"Async tests:   {'✓ PASSED' if async_passed else '✗ FAILED'}")
-    print(f"Browser tests: {'✓ PASSED' if browser_passed else '✗ FAILED'}")
+    print(f"Async tests:           {'✓ PASSED' if async_passed else '✗ FAILED'}")
+    print(f"Browser tests (M0/Flex): {'✓ PASSED' if browser_passed else '✗ FAILED'}")
     print("=" * 80)
+    print("ℹ️  M10 tests skipped (use 'inv m10-test' or 'inv test-release')")
 
     if not (async_passed and browser_passed):
         print("\n⚠ Some tests failed!")
         raise SystemExit(1)
     else:
-        print("\n✓ All tests passed!")
+        print("\n✓ Development tests passed!")
+        if coverage:
+            print(f"\nCoverage report: file://{Path('htmlcov/index.html').absolute()}")
+
+
+@task
+def test_release(c, verbose=True, coverage=True, parallel=True):
+    """
+    Run complete test suite for releases (includes all tests).
+
+    This runs all tests including slow M10 tests. Use this before
+    creating a release or merging to main.
+
+    For faster development iteration, use 'inv test-dev' instead.
+
+    Args:
+        verbose: Run tests in verbose mode (default: True)
+        coverage: Generate coverage report (default: True)
+        parallel: Run test suites in parallel (default: True, use --no-parallel to disable)
+    """
+    print("=" * 80)
+    print("Running COMPLETE Test Suite for Release")
+    if parallel:
+        print("(Async, Browser, and M10 tests in PARALLEL)")
+    print("=" * 80)
+    print("⚠️  This includes M10 tests (~9 min cluster creation)")
+    print("")
+
+    if parallel:
+        # Run all three test suites in parallel
+        import subprocess
+
+        print("\n[1/3] Starting async tests in background...")
+        print("-" * 80)
+        async_cmd = ["uv", "run", "pytest", "tests/", "-m", "not browser"]
+        if verbose:
+            async_cmd.append("-v")
+        if coverage:
+            async_cmd.extend([
+                "--cov=atlasui",
+                "--cov-report=html",
+                "--cov-report=term"
+            ])
+
+        async_proc = subprocess.Popen(
+            async_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+
+        print("\n[2/3] Starting browser tests (M0/Flex) in background...")
+        print("-" * 80)
+        browser_cmd = ["uv", "run", "pytest", "tests/", "-m", "browser and not m10"]
+        if verbose:
+            browser_cmd.append("-v")
+
+        browser_proc = subprocess.Popen(
+            browser_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+
+        print("\n[3/3] Starting M10 tests in background...")
+        print("-" * 80)
+        m10_cmd = ["uv", "run", "pytest", "tests/", "-m", "browser and m10"]
+        if verbose:
+            m10_cmd.append("-v")
+
+        m10_proc = subprocess.Popen(
+            m10_cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
+
+        # Wait for all to complete
+        print("\nWaiting for all test suites to complete...")
+        async_output, _ = async_proc.communicate()
+        browser_output, _ = browser_proc.communicate()
+        m10_output, _ = m10_proc.communicate()
+
+        async_passed = async_proc.returncode == 0
+        browser_passed = browser_proc.returncode == 0
+        m10_passed = m10_proc.returncode == 0
+
+        # Print outputs
+        print("\n" + "=" * 80)
+        print("ASYNC TEST OUTPUT")
+        print("=" * 80)
+        print(async_output)
+
+        print("\n" + "=" * 80)
+        print("BROWSER TEST OUTPUT (M0/Flex)")
+        print("=" * 80)
+        print(browser_output)
+
+        print("\n" + "=" * 80)
+        print("M10 TEST OUTPUT")
+        print("=" * 80)
+        print(m10_output)
+
+    else:
+        # Run sequentially
+        print("\n[1/3] Running async tests (unit + integration)...")
+        print("-" * 80)
+        async_cmd = ["uv", "run", "pytest", "tests/", "-m", '"not browser"']
+
+        if verbose:
+            async_cmd.append("-v")
+
+        if coverage:
+            async_cmd.extend([
+                "--cov=atlasui",
+                "--cov-report=html",
+                "--cov-report=term"
+            ])
+
+        result = c.run(" ".join(async_cmd), warn=True)
+        async_passed = result.ok
+
+        # Run browser tests (excluding M10)
+        print("\n[2/3] Running browser tests (M0/Flex)...")
+        print("-" * 80)
+        browser_cmd = ["uv", "run", "pytest", "tests/", "-m", '"browser and not m10"']
+
+        if verbose:
+            browser_cmd.append("-v")
+
+        result = c.run(" ".join(browser_cmd), warn=True)
+        browser_passed = result.ok
+
+        # Run M10 tests
+        print("\n[3/3] Running M10 tests...")
+        print("-" * 80)
+        m10_cmd = ["uv", "run", "pytest", "tests/", "-m", '"browser and m10"']
+
+        if verbose:
+            m10_cmd.append("-v")
+
+        result = c.run(" ".join(m10_cmd), warn=True)
+        m10_passed = result.ok
+
+    # Summary
+    print("\n" + "=" * 80)
+    print("Complete Test Suite Summary")
+    print("=" * 80)
+    print(f"Async tests:           {'✓ PASSED' if async_passed else '✗ FAILED'}")
+    print(f"Browser tests (M0/Flex): {'✓ PASSED' if browser_passed else '✗ FAILED'}")
+    print(f"M10 tests:             {'✓ PASSED' if m10_passed else '✗ FAILED'}")
+    print("=" * 80)
+
+    if not (async_passed and browser_passed and m10_passed):
+        print("\n⚠ Some tests failed!")
+        raise SystemExit(1)
+    else:
+        print("\n✓ All tests passed! Ready for release.")
         if coverage:
             print(f"\nCoverage report: file://{Path('htmlcov/index.html').absolute()}")
 
@@ -402,3 +660,39 @@ def setup(c):
     print("  2. Run: inv info (to test connection)")
     print("  3. Run: inv run (to start web server)")
     print("  4. Run: inv --list (to see all commands)")
+
+
+@task
+def cleanup_tests(c, list_only=False, force=False, project_id=None):
+    """
+    Clean up leftover test resources from interrupted test runs.
+
+    When browser tests are interrupted (Ctrl+C, crash, timeout), the test
+    project and clusters may not be cleaned up. This task helps manage those
+    leftover resources.
+
+    Args:
+        list_only: Only list test projects without deleting (default: False)
+        force: Skip confirmation prompts (default: False)
+        project_id: Delete a specific project by ID (optional)
+
+    Examples:
+        inv cleanup-tests --list-only        # List all test projects
+        inv cleanup-tests                     # Delete all test projects (with confirmation)
+        inv cleanup-tests --force             # Delete without confirmation
+        inv cleanup-tests --project-id=ID    # Delete specific project
+    """
+    cmd = ["uv", "run", "python", "tests/cleanup_test_resources.py"]
+
+    if list_only:
+        cmd.append("--list")
+    elif project_id:
+        cmd.extend(["--project-id", project_id])
+        if force:
+            cmd.append("--force")
+    else:
+        cmd.append("--clean")
+        if force:
+            cmd.append("--force")
+
+    c.run(" ".join(cmd), pty=True)

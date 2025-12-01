@@ -44,7 +44,7 @@ def log(msg: str) -> None:
 BASE_URL = "http://localhost:8100"
 
 
-def poll_cluster_state(project_id: str, cluster_name: str, expected_paused: bool) -> dict:
+def poll_cluster_state(project_id: str, cluster_name: str, expected_paused: bool, timeout: int = 900) -> dict:
     """
     Poll the cluster API until it reaches a stable state with the expected paused flag.
 
@@ -57,16 +57,20 @@ def poll_cluster_state(project_id: str, cluster_name: str, expected_paused: bool
         project_id: The project ID
         cluster_name: The cluster name
         expected_paused: The expected paused flag (True for paused, False for running)
+        timeout: Maximum time to wait in seconds (default: 900 = 15 minutes)
 
     Returns:
         The cluster data when state is reached
+
+    Raises:
+        TimeoutError: If the cluster doesn't reach the expected state within timeout
     """
     start_time = time.time()
     poll_interval = 5  # seconds
     # Transitional states that indicate the cluster is still changing
     transitional_states = ["CREATING", "UPDATING", "REPAIRING", "DELETING", "PAUSING", "RESUMING"]
 
-    while True:
+    while time.time() - start_time < timeout:
         elapsed = int(time.time() - start_time)
 
         try:
@@ -93,6 +97,15 @@ def poll_cluster_state(project_id: str, cluster_name: str, expected_paused: bool
             log(f"   Poll error: {e} ({elapsed}s elapsed)")
 
         time.sleep(poll_interval)
+
+    # Timeout reached
+    elapsed = int(time.time() - start_time)
+    error_msg = (
+        f"Timeout after {elapsed}s waiting for cluster '{cluster_name}' "
+        f"to reach paused={expected_paused}"
+    )
+    log(f"   ✗ {error_msg}")
+    raise TimeoutError(error_msg)
 
 
 # =============================================================================
@@ -162,7 +175,8 @@ def test_pause_resume_m10(page: Page, atlasui_server, m10_cluster):
     # Verify status shows PAUSED (UI may display multiple badges - IDLE and PAUSED)
     cluster_row = page.locator(f'tr[data-cluster-name="{cluster_name}"]')
     # Look for PAUSED badge specifically since paused clusters show both IDLE and PAUSED
-    paused_badge = cluster_row.locator("td:nth-child(4) .badge:has-text('PAUSED')")
+    # Status column is td:nth-child(3): Name | Project | Status | Type | ...
+    paused_badge = cluster_row.locator("td:nth-child(3) .badge:has-text('PAUSED')")
     assert paused_badge.count() > 0, f"Expected PAUSED badge for cluster {cluster_name}"
     log(f"   Status badge: PAUSED verified")
 

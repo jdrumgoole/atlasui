@@ -23,6 +23,42 @@ Browser tests use Playwright to test the web UI and require a running server:
 
 **Important:** Browser tests should be run separately from async tests to avoid event loop conflicts. See "Running Tests" section below.
 
+## Test Performance and Optimization
+
+**Performance Baseline:**
+- Full test suite: ~20-25 minutes
+- Browser tests (M0/Flex only): ~11 minutes
+- M10 tests: ~20 minutes (includes 9 min cluster creation)
+- Async tests: ~30-40 seconds
+
+**Test Suites:**
+```bash
+# Development: Fast iteration (excludes M10) - ✅ RECOMMENDED
+inv test-dev                    # ~11 minutes (runs in parallel by default)
+inv test-dev --no-parallel      # Sequential execution
+
+# M10 tests only (pause/resume functionality)
+inv m10-test                    # ~20 minutes
+
+# Release: Complete test suite (includes M10)
+inv test-release                # ~20-25 minutes (runs in parallel by default)
+inv test-release --no-parallel  # Sequential execution
+```
+
+**Direct pytest usage:**
+```bash
+# Skip slow M10 tests
+pytest tests/ -m "browser and not m10"
+
+# Run M10 tests only
+pytest tests/ -m "browser and m10"
+
+# Run only quick tests (< 10 seconds)
+pytest -m "quick"
+```
+
+See [docs/TEST_OPTIMIZATION.md](../docs/TEST_OPTIMIZATION.md) for comprehensive optimization strategies.
+
 ## Running Tests
 
 ### Prerequisites
@@ -206,6 +242,42 @@ pytest -x
 # Run last failed tests
 pytest --lf
 ```
+
+## Cleaning Up Test Resources
+
+Browser tests create real Atlas projects and clusters (with names like `test-session-{timestamp}`). These resources are automatically cleaned up when tests complete normally. However, if tests are interrupted (Ctrl+C, crash, timeout), resources may remain.
+
+### Check for Leftover Resources
+
+```bash
+# List all test projects
+inv cleanup-tests --list-only
+
+# Or use the script directly
+uv run python tests/cleanup_test_resources.py --list
+```
+
+### Clean Up All Test Projects
+
+```bash
+# Delete all test projects (with confirmation)
+inv cleanup-tests
+
+# Or force delete without confirmation
+inv cleanup-tests --force
+```
+
+### Clean Up Specific Project
+
+```bash
+# Delete by project ID
+inv cleanup-tests --project-id=PROJECT_ID
+
+# Or using the script
+uv run python tests/cleanup_test_resources.py --project-id PROJECT_ID
+```
+
+**Important:** Cleanup deletes the project with `confirmed=true`, which cascade deletes all clusters in that project. This helps avoid incurring costs for leftover test resources.
 
 ## Test Data
 

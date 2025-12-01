@@ -609,28 +609,64 @@ class OperationManager:
         client: AtlasClient,
         project_id: str,
         cluster_name: str,
-        operation: Operation
+        parent_operation: Operation
     ):
-        """Delete a single cluster (helper for parallel deletion)"""
+        """Delete a single cluster (helper for parallel deletion).
+
+        Creates a separate Operation for each cluster deletion so it appears
+        in the operations log and triggers UI updates on the all clusters page.
+        """
+        # Create a separate Operation for this cluster deletion
+        self.operation_id_counter += 1
+        cluster_operation = Operation(
+            id=self.operation_id_counter,
+            type=OperationType.DELETE_CLUSTER,
+            name=f"Deleting cluster: {cluster_name}",
+            metadata={
+                "project_id": project_id,
+                "cluster_name": cluster_name,
+                "parent_operation_id": parent_operation.id
+            }
+        )
+        self.operations[cluster_operation.id] = cluster_operation
+
+        # Emit queued event
+        await self._notify_listeners("queued", cluster_operation)
+
         try:
             logger.info(f"Initiating deletion of cluster: {cluster_name}")
 
+            # Mark as in-progress
+            cluster_operation.started_at = datetime.utcnow()
+            cluster_operation.update_status(OperationStatus.IN_PROGRESS, "Starting cluster deletion")
+            await self._notify_listeners("started", cluster_operation)
+
             # Try regular cluster deletion first
+            is_flex = False
             try:
                 await client.delete_cluster(project_id, cluster_name)
+                cluster_operation.update_progress("Deletion initiated, waiting for completion...")
+                await self._notify_listeners("progress", cluster_operation)
             except Exception as e:
                 error_msg = str(e)
                 # If cluster is already being deleted, that's fine - continue
                 if "already been requested for deletion" in error_msg:
                     logger.info(f"Cluster {cluster_name} is already being deleted, skipping...")
+                    cluster_operation.update_progress("Cluster already being deleted, monitoring...")
+                    await self._notify_listeners("progress", cluster_operation)
                 # If it fails with Flex cluster error, try Flex deletion
                 elif "Flex cluster" in error_msg and "cannot be used in the Cluster API" in error_msg:
+                    is_flex = True
                     try:
                         await client.delete_flex_cluster(project_id, cluster_name)
+                        cluster_operation.update_progress("Flex cluster deletion initiated...")
+                        await self._notify_listeners("progress", cluster_operation)
                     except Exception as flex_e:
                         # If Flex deletion also fails with "already requested", that's also fine
                         if "already been requested for deletion" in str(flex_e):
                             logger.info(f"Flex cluster {cluster_name} is already being deleted, skipping...")
+                            cluster_operation.update_progress("Flex cluster already being deleted, monitoring...")
+                            await self._notify_listeners("progress", cluster_operation)
                         else:
                             raise
                 else:
@@ -641,8 +677,18 @@ class OperationManager:
 
             logger.info(f"Cluster {cluster_name} deleted successfully")
 
+            # Mark as completed
+            cluster_operation.update_status(OperationStatus.COMPLETED, "Cluster deleted successfully")
+            cluster_operation.completed_at = datetime.utcnow()
+            await self._notify_listeners("completed", cluster_operation)
+
         except Exception as e:
             logger.error(f"Failed to delete cluster {cluster_name}: {e}")
+            # Mark as failed
+            cluster_operation.update_status(OperationStatus.FAILED, str(e))
+            cluster_operation.error = str(e)
+            cluster_operation.completed_at = datetime.utcnow()
+            await self._notify_listeners("failed", cluster_operation)
             raise Exception(f"Failed to delete cluster {cluster_name}: {e}")
 
     async def _poll_project_clusters_gone(

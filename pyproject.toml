@@ -1,8 +1,8 @@
 [project]
 name = "atlasui"
-version = "0.2.3"
+version = "0.3.0"
 description = "User Interface for MongoDB Atlas - Web UI and CLI tool"
-readme = "README.md"
+readme = "README.pypi.md"
 authors = [
     {name = "Joe Drumgoole"}
 ]
@@ -71,8 +71,13 @@ markers = [
     "lifecycle: marks cluster lifecycle tests (can run in parallel)",
     "m0: marks M0 cluster tests",
     "flex: marks Flex cluster tests",
-    "m10: marks M10 cluster tests",
+    "m10: marks M10 cluster tests (slow: 9+ min cluster creation)",
     "browser: marks tests that use Playwright browser automation (run separately from async tests)",
+    "slow: marks tests as slow running (> 1 minute)",
+    "quick: marks tests as quick running (< 10 seconds)",
+    "pause_resume: marks pause/resume functionality tests",
+    "restrictions: marks cluster restrictions tests",
+    "display: marks UI display tests",
 ]
 addopts = "-v --strict-markers"
 

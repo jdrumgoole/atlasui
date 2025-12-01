@@ -214,13 +214,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 // Reload projects list when:
                 // - create_project completes (new project added)
+                // - delete_project completes (project removed)
                 // - create_cluster completes (cluster count increases)
                 // - delete_cluster completes (cluster count decreases)
                 if (event === 'completed' &&
                     (operation.type === 'create_project' ||
+                     operation.type === 'delete_project' ||
                      operation.type === 'create_cluster' ||
                      operation.type === 'delete_cluster')) {
-                    console.log(`[Projects] ${operation.type} completed, reloading projects list to update cluster counts`);
+                    console.log(`[Projects] ${operation.type} completed, reloading projects list`);
                     loadProjects();
                 }
             });

@@ -28,3 +28,4 @@ When making a release, follow this exact order:
 - pyproject.toml's version is synchronised from the config.py
 - use shot-scraper to take screen shots
 - always syncrhonize the sphinx documentation version with the pyproject.toml version
+- when using shot-scraper for documentation screehshots give the page 5 seconds to load
