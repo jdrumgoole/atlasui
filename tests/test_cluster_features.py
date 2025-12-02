@@ -447,6 +447,96 @@ def test_cluster_status_badges(page: Page, atlasui_server, test_clusters):
 # =============================================================================
 # Future Feature Tests
 # =============================================================================
+@pytest.mark.browser
+@pytest.mark.integration
+@pytest.mark.display
+def test_project_details_ip_access_list(page: Page, atlasui_server, test_project):
+    """
+    Verify IP access list section displays in project details panel.
+
+    This test:
+    1. Navigates to organization projects page
+    2. Opens project details panel
+    3. Verifies IP Access List section exists
+    4. Checks that section shows entries or "No IP access list entries" message
+    """
+    project_id = test_project["project_id"]
+    project_name = test_project["project_name"]
+    org_id = test_project["org_id"]
+
+    log("\n" + "=" * 80)
+    log("TEST: Verify IP Access List in Project Details")
+    log("=" * 80)
+    log(f"   Project ID: {project_id}")
+    log(f"   Project Name: {project_name}")
+    log(f"   Organization ID: {org_id}")
+
+    # Step 1: Navigate to organization projects page
+    log(f"\n1. Navigating to {BASE_URL}/organizations/{org_id}/projects")
+    page.goto(f"{BASE_URL}/organizations/{org_id}/projects")
+    page.wait_for_load_state("domcontentloaded")
+
+    # Step 2: Wait for projects to load
+    log("2. Waiting for projects table to load")
+    page.wait_for_selector("#projectsContainer table", timeout=30000)
+
+    # Step 3: Find and click the project name link to open details
+    log(f"3. Looking for project name link: {project_name}")
+    project_link = page.locator(f'a[onclick*="showProjectDetails(\'{project_id}\')"]')
+
+    # Verify link exists
+    assert project_link.count() > 0, f"Project name link not found for project {project_id}"
+    log("   Found project name link")
+
+    # Click the project name link
+    log("4. Clicking project name to open project details panel")
+    project_link.first.click()
+
+    # Step 4: Wait for the offcanvas panel to open
+    log("5. Waiting for project details panel to open")
+    page.wait_for_selector("#detailsPanel.show", timeout=10000)
+
+    # Wait for details content to load (not showing loading spinner)
+    page.wait_for_selector("#detailsContent h5", timeout=10000)
+    log("   Project details panel opened")
+
+    # Step 5: Verify IP Access List section exists
+    log("6. Verifying IP Access List section exists")
+
+    # Look for the IP Access List heading
+    ip_access_heading = page.locator("#detailsContent h6:has-text('IP Access List')")
+    assert ip_access_heading.count() > 0, "IP Access List section heading not found"
+    log("   ✓ IP Access List heading found")
+
+    # Step 6: Verify section shows either entries or empty message
+    log("7. Checking IP Access List content")
+
+    # Check if there's a table (entries exist) or a "No IP access list entries" message
+    has_table = page.locator("#detailsContent table thead th:has-text('IP/CIDR')").count() > 0
+    has_empty_message = page.locator("#detailsContent p:has-text('No IP access list entries configured')").count() > 0
+
+    if has_table:
+        log("   ✓ IP Access List table with entries found")
+        # Verify table has the correct columns
+        assert page.locator("#detailsContent table thead th:has-text('Comment')").count() > 0, \
+            "IP Access List table missing Comment column"
+        log("   ✓ Table has IP/CIDR and Comment columns")
+    elif has_empty_message:
+        log("   ✓ 'No IP access list entries configured' message displayed")
+    else:
+        raise AssertionError("IP Access List section found but shows neither table nor empty message")
+
+    # Step 7: Verify the count is displayed in the Basic Information table
+    log("8. Verifying IP Access List count in Basic Information")
+    ip_count_row = page.locator("#detailsContent table tr:has(th:has-text('IP Access List'))")
+    assert ip_count_row.count() > 0, "IP Access List row not found in Basic Information table"
+    log("   ✓ IP Access List count displayed in Basic Information table")
+
+    log("\n" + "=" * 80)
+    log("TEST PASSED: IP Access List displays correctly in project details")
+    log("=" * 80)
+
+
 # Add more tests here that require running clusters. Examples:
 #
 # @pytest.mark.integration

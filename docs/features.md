@@ -343,6 +343,22 @@ Or for CIDR blocks:
 }
 ```
 
+### Testing
+
+The IP Access List Management feature includes comprehensive Playwright browser tests in `tests/test_ip_management_ui.py`:
+
+* Modal opening and form element verification
+* IP access list loading and display
+* Adding IP addresses via the UI
+* Deleting IP addresses
+* Form validation
+* Project name display in modal title
+
+Run the tests with:
+```bash
+uv run pytest tests/test_ip_management_ui.py -v -s
+```
+
 ## Responsive UI
 
 The interface is built with Bootstrap 5 and provides:

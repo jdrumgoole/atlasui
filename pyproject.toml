@@ -1,6 +1,6 @@
 [project]
 name = "atlasui"
-version = "0.3.2"
+version = "0.3.3"
 description = "User Interface for MongoDB Atlas - Web UI and CLI tool"
 readme = "README.pypi.md"
 authors = [
