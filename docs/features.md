@@ -359,6 +359,52 @@ Run the tests with:
 uv run pytest tests/test_ip_management_ui.py -v -s
 ```
 
+## Open in MongoDB Compass
+
+AtlasUI provides a convenient way to open your MongoDB cluster directly in MongoDB Compass, the official GUI for MongoDB.
+
+### Overview
+
+The Databases page includes an "Open in Compass" button that attempts to launch MongoDB Compass with your cluster's connection string pre-filled.
+
+### How It Works
+
+1. Navigate to a cluster's Databases page
+2. Click the **Open in Compass** button (blue compass icon)
+3. If Compass is installed, it will open automatically with the connection string
+4. If Compass doesn't open, a help modal appears with:
+   - A link to download MongoDB Compass
+   - The connection string to copy and paste manually
+   - A "Try Again" button to retry opening Compass
+
+### Connection String Handling
+
+* The connection string is automatically extracted from the cluster's configuration
+* Credentials are **not** included in the connection string for security
+* You will be prompted to enter your database username and password in Compass
+
+### Download MongoDB Compass
+
+If Compass is not installed, the modal provides a direct link to the official MongoDB Compass download page:
+
+* [Download MongoDB Compass](https://www.mongodb.com/try/download/compass)
+
+Compass is available for:
+* Windows
+* macOS
+* Linux (Ubuntu, RHEL, Debian)
+
+### Copying the Connection String
+
+The help modal includes:
+* A read-only text field displaying the connection string
+* A copy button to copy the string to your clipboard
+* Visual feedback when the copy is successful
+
+### Technical Details
+
+MongoDB Compass registers as a protocol handler for `mongodb://` and `mongodb+srv://` URLs. When you click "Open in Compass", AtlasUI attempts to open the connection string URL, which triggers Compass to launch if installed.
+
 ## Responsive UI
 
 The interface is built with Bootstrap 5 and provides:
