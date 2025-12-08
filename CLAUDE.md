@@ -29,3 +29,5 @@ When making a release, follow this exact order:
 - use shot-scraper to take screen shots
 - always syncrhonize the sphinx documentation version with the pyproject.toml version
 - when using shot-scraper for documentation screehshots give the page 5 seconds to load
+- we publish to pypi via a github action
+- servers started within the development environment should always run on port 8100. All tests should connect to port 8100 by default.

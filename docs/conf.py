@@ -6,9 +6,9 @@ sys.path.insert(0, os.path.abspath('..'))
 
 # -- Project information -----------------------------------------------------
 project = 'AtlasUI'
-copyright = '2024, Independent Developer'
-author = 'Independent Developer'
-release = '0.3.3'
+copyright = 'Creation Commons'
+author = 'joe@joedrumgoole.com'
+release = '0.3.4'
 
 # -- General configuration ---------------------------------------------------
 extensions = [

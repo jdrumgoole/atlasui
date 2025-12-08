@@ -27,6 +27,24 @@ inv m10-test
 inv test-release
 ```
 
+## Important: Running Async and Browser Tests
+
+**Async integration tests and browser tests must be run separately** to avoid event loop conflicts.
+
+```bash
+# Run async integration tests separately
+uv run pytest tests/test_integration.py -v
+
+# Run browser tests separately
+uv run pytest tests/ -m "browser and not m10" -v
+
+# Or use the convenience commands which handle this automatically
+inv test-dev        # Development tests (excludes M10)
+inv test-release    # Full test suite
+```
+
+The reason is that Playwright browser tests use their own event loop, and pytest-asyncio's async fixtures conflict when run in the same session. This is documented in `tests/conftest.py`.
+
 ## Current Performance Baseline
 
 **Browser Tests (Full Suite):**

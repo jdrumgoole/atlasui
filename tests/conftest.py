@@ -454,6 +454,10 @@ async def atlas_client(validate_credentials):
 
     Requires valid credentials to be configured.
     Skips test if credentials are not valid.
+
+    Note: This fixture uses function scope and creates a new client for each test.
+    Async integration tests should be run separately from browser tests to avoid
+    event loop conflicts.
     """
     if not validate_credentials:
         pytest.skip("Atlas API credentials not configured or invalid")
